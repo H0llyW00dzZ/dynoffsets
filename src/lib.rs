@@ -65,6 +65,12 @@ pub use r#static::register_interfaces as __register_interfaces_static;
 #[doc(hidden)]
 pub use r#static::register_schema as __register_schema_static;
 
+/// Hidden re-export used by macro-generated accessors so they can cache their
+/// resolved offset in a `OnceCell<usize>` without depending on
+/// `std::sync::OnceLock` (which would break `default-features = false` builds).
+#[doc(hidden)]
+pub use sync::OnceCell as __AccessorCell;
+
 #[cfg(all(test, feature = "runtime"))]
 mod mock;
 #[cfg(all(test, feature = "runtime"))]
