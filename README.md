@@ -62,7 +62,20 @@ let list = client_dll::dw_entity_list();
 With the `runtime` feature + a `Process` impl, you get live values.
 Without it, you get the literal. `no_std` + `alloc` ok.
 
-Designed for custom memory backends. Prefer `no_std` and your own `Process` implementation.
+### Custom memory backends
+
+dynoffsets is **backend-agnostic** — you must bring your own `Process` implementation:
+
+```rust
+impl Process for MyBackend { ... }   // usermode, kernel, DMA, etc.
+dynoffsets::init(MyBackend::new());
+```
+
+Supported backends include (but are not limited to):
+- usermode `ReadProcessMemory`
+- kernel drivers (any IOCTL, physical memory, etc.)
+- DMA / PCIe cards, FPGA, Thunderbolt DMA
+- hypervisor / VM introspection
 
 Windows only today. TODO: Linux support.
 
