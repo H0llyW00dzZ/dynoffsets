@@ -199,11 +199,14 @@ fn rewrite_schema_module(class_mod: &mut ItemMod, args: &Args) {
         } = info;
         if enabled {
             let lookup = if hashed {
+                let dll_len = dll.len() as u16;
+                let class_len = class_lit.value().len() as u16;
+                let field_len = field_str.value().len() as u16;
                 quote! {
                     ::dynoffsets::lookup_or_fallback_h(
-                        ::dynoffsets::fnv1a(#dll),
-                        ::dynoffsets::fnv1a(#class_lit),
-                        ::dynoffsets::fnv1a(#field_str),
+                        ::dynoffsets::fnv1a(#dll), #dll_len,
+                        ::dynoffsets::fnv1a(#class_lit), #class_len,
+                        ::dynoffsets::fnv1a(#field_str), #field_len,
                         #lit_expr
                     )
                 }
@@ -587,6 +590,11 @@ mod tests {
         assert!(s.contains("fnv1a"));
         // the str version should not be called for this accessor
         assert_eq!(s.matches("lookup_or_fallback(").count(), 0);
+        // `u16` length literals next to each `fnv1a(...)` call: "client.dll" -> 10,
+        // "C_Foo" -> 5, "m_x" -> 3.
+        assert!(s.contains("10u16"));
+        assert!(s.contains("5u16"));
+        assert!(s.contains("3u16"));
     }
 
     #[test]

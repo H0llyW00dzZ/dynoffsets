@@ -22,8 +22,10 @@ use alloc::vec;
 /// Turns each `pub const NAME: usize = LIT;` into `pub fn NAME() -> usize`.
 /// Returns live value when runtime discovery succeeds, else the literal.
 ///
-/// `hashed` emits `lookup_or_fallback_h(fnv1a("dll"), fnv1a("Class"), fnv1a("field"), lit)`
-/// so no schema name strings appear in the caller's `.rdata`.
+/// `hashed` emits
+/// `lookup_or_fallback_h(fnv1a("dll"), "dll".len(), fnv1a("Class"), "Class".len(), fnv1a("field"), "field".len(), lit)`
+/// so no schema name strings appear in the caller's `.rdata`. The length pairs
+/// fold to `u16` immediates in `.text`.
 ///
 /// With `r#static`, emits `AtomicUsize` per offset + `__dynoffsets_register()`.
 /// Call the register fn after `init`, then `populate()` to fill the cells. (hashed ignored in static mode)
@@ -305,7 +307,15 @@ pub fn lookup_or_fallback(module: &str, class: &str, field: &str, fallback: usiz
     let mh = fnv1a(module);
     let ch = fnv1a(class);
     let fh = fnv1a(field);
-    lookup_or_fallback_h(mh, ch, fh, fallback)
+    lookup_or_fallback_h(
+        mh,
+        module.len() as u16,
+        ch,
+        class.len() as u16,
+        fh,
+        field.len() as u16,
+        fallback,
+    )
 }
 
 /// Internal helper used by the cached `#[schema]` accessor.
@@ -318,33 +328,60 @@ pub fn try_lookup_offset(module: &str, class: &str, field: &str) -> Option<usize
     let mh = fnv1a(module);
     let ch = fnv1a(class);
     let fh = fnv1a(field);
-    try_lookup_offset_h(mh, ch, fh)
+    try_lookup_offset_h(
+        mh,
+        module.len() as u16,
+        ch,
+        class.len() as u16,
+        fh,
+        field.len() as u16,
+    )
 }
 
 /// Hash-keyed variant of [`lookup_or_fallback`].
 ///
 /// Intended for `#[schema(hashed)]` emission so no `&str` literals reach the
-/// caller's `.rdata`. The three hashes are produced at compile time by `fnv1a`.
+/// caller's `.rdata`. The three hashes are produced at compile time by `fnv1a`;
+/// the three lengths are emitted by the macro as `u16` immediates next to each
+/// hash and are checked alongside it to discriminate hash collisions.
 #[inline]
 pub fn lookup_or_fallback_h(
     dll_hash: u32,
+    dll_len: u16,
     class_hash: u32,
+    class_len: u16,
     field_hash: u32,
+    field_len: u16,
     fallback: usize,
 ) -> usize {
-    try_lookup_offset_h(dll_hash, class_hash, field_hash).unwrap_or(fallback)
+    try_lookup_offset_h(
+        dll_hash, dll_len, class_hash, class_len, field_hash, field_len,
+    )
+    .unwrap_or(fallback)
 }
 
 /// Hash-keyed variant of [`try_lookup_offset`].
 #[inline]
-pub fn try_lookup_offset_h(dll_hash: u32, class_hash: u32, field_hash: u32) -> Option<usize> {
+pub fn try_lookup_offset_h(
+    dll_hash: u32,
+    dll_len: u16,
+    class_hash: u32,
+    class_len: u16,
+    field_hash: u32,
+    field_len: u16,
+) -> Option<usize> {
     #[cfg(feature = "runtime")]
     {
-        walker::lookup_offset_h(dll_hash, class_hash, field_hash).map(|off| off as usize)
+        walker::lookup_offset_h(
+            dll_hash, dll_len, class_hash, class_len, field_hash, field_len,
+        )
+        .map(|off| off as usize)
     }
     #[cfg(not(feature = "runtime"))]
     {
-        let _ = (dll_hash, class_hash, field_hash);
+        let _ = (
+            dll_hash, dll_len, class_hash, class_len, field_hash, field_len,
+        );
         None
     }
 }
