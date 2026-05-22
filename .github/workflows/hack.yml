@@ -42,11 +42,11 @@ jobs:
       uses: Swatinem/rust-cache@v2
 
     - name: Test (stable / beta / nightly)
-      if: ${{ matrix.rust != '1.70' }}
+      if: ${{ matrix.rust != '1.85' }}
       run: cargo test --all-features
 
-    # MSRV check: only verify the library itself compiles on 1.70.
+    # MSRV check: only verify the library itself compiles on 1.85.
     # Using `cargo build` (not `test`) so dev-dependencies are not resolved.
-    - name: MSRV build check (1.70)
-      if: ${{ matrix.rust == '1.70' }}
+    - name: MSRV build check (1.85)
+      if: ${{ matrix.rust == '1.85' }}
       run: cargo build --all-features --verbose
