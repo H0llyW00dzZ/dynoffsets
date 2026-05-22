@@ -167,11 +167,13 @@ pub fn discover_globals() -> RuntimeGlobals {
         .map(|i| prediction.wrapping_add(i as usize))
     });
 
+    // "lea rcx, [rip+disp32]; movd xmm1, ebp"
     let dw_sensitivity = find_offset_rip32(
         "client.dll",
         sig!(0x48 0x8D 0x0D ? ? ? ? 0x66 0x0F 0x6E 0xCD),
         3,
-    );
+    )
+    .map(|v| v.wrapping_add(8));
     let dw_sensitivity_sensitivity = find_pattern_u8(
         "client.dll",
         sig!(0x48 0x8D 0x7E ? 0x48 0x0F 0xBA 0xE0 ? 0x72 ? 0x85 0xD2 0x49 0x0F 0x4F 0xFF),
