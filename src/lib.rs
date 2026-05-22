@@ -208,6 +208,15 @@ pub fn init<P: Process>(p: P) {
     let _ = PROCESS.set(Box::new(p));
 }
 
+/// Returns `true` after [`init`] has been called.
+///
+/// Lightweight (one atomic load). Used by the macro-generated accessors to
+/// avoid caching the literal fallback before a process backend is installed.
+#[inline]
+pub fn is_initialized() -> bool {
+    PROCESS.get().is_some()
+}
+
 #[cfg(feature = "runtime")]
 pub(crate) fn process() -> Option<&'static dyn Process> {
     PROCESS.get().map(|b| &**b)
@@ -262,10 +271,23 @@ pub fn get_runtime_buttons() -> Option<&'static RuntimeButtons> {
 /// Returns the runtime offset if the schema walker found it, otherwise `fallback`.
 #[inline]
 pub fn lookup_or_fallback(module: &str, class: &str, field: &str, fallback: usize) -> usize {
+    try_lookup_offset(module, class, field).unwrap_or(fallback)
+}
+
+/// Internal helper used by the cached `#[schema]` accessor.
+///
+/// Returns `Some(off)` only when the schema walker successfully resolved the
+/// field. The macro uses this to gate the per-accessor cache write so a miss
+/// (e.g. schema system not yet populated) does not latch the literal fallback.
+#[inline]
+pub fn try_lookup_offset(module: &str, class: &str, field: &str) -> Option<usize> {
     #[cfg(feature = "runtime")]
-    if let Some(off) = walker::lookup_offset(module, class, field) {
-        return off as usize;
+    {
+        walker::lookup_offset(module, class, field).map(|off| off as usize)
     }
-    let _ = (module, class, field);
-    fallback
+    #[cfg(not(feature = "runtime"))]
+    {
+        let _ = (module, class, field);
+        None
+    }
 }
