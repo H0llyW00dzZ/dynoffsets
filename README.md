@@ -76,4 +76,4 @@ dynoffsets is the library alternative: it bakes the same patterns into the binar
 
 Small game updates that only move addresses can often be survived without regenerating headers.
 
-MSRV 1.71. [MIT](./LICENSE).
+MSRV 1.72. [MIT](./LICENSE).

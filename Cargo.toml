@@ -2,7 +2,7 @@
 name = "dynoffsets"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.71"
+rust-version = "1.72"
 authors = ["H0llyW00dzZ"]
 description = "Resolve engine struct offsets, module-global pointers, registered interfaces and button-state addresses from a running target process at call time, with compile-time fallback literals. Attribute macros generate the accessors."
 license = "MIT"
