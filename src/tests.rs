@@ -529,6 +529,34 @@ fn discover_globals_resolves_one_known_pattern() {
 }
 
 #[test]
+fn discover_globals_dw_sensitivity_adds_eight() {
+    // cs2-dumper's reference pattern is `488d0d${[8]'} 660f6ecd` — resolve
+    // the RIP-relative LEA target *and add 8*. dynoffsets must publish the
+    // same value, otherwise consumers calling `dw_sensitivity +
+    // dw_sensitivity_sensitivity` skip the 8-byte holder header and read
+    // the wrong field.
+    let _g = setup();
+    let pat: &[Option<u8>] = &[
+        Some(0x48),
+        Some(0x8D),
+        Some(0x0D),
+        None,
+        None,
+        None,
+        None,
+        Some(0x66),
+        Some(0x0F),
+        Some(0x6E),
+        Some(0xCD),
+    ];
+    populate(|s| s.add_module("client.dll", 0));
+    // Raw RIP-resolved RVA is 0x233bb60; published value must be 0x233bb68.
+    sigscan::set_pattern_rip32("client.dll", pat, 3, Some(0x0233_BB60_usize));
+    let r = offsets::discover_globals();
+    assert_eq!(r.dw_sensitivity, Some(0x0233_BB68_usize));
+}
+
+#[test]
 fn discover_globals_resolves_view_angles_as_csgo_input_plus_imm() {
     let _g = setup();
     let csgo_pat: &[Option<u8>] = &[
