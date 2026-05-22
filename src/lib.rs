@@ -17,13 +17,16 @@ use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec;
 
-/// `#[schema]` / `#[schema("client.dll")]` / `#[schema(false)]` / `#[schema(..., r#static)]`
+/// `#[schema]` / `#[schema("client.dll")]` / `#[schema(false)]` / `#[schema(..., r#static)]` / `#[schema(hashed)]`
 ///
 /// Turns each `pub const NAME: usize = LIT;` into `pub fn NAME() -> usize`.
 /// Returns live value when runtime discovery succeeds, else the literal.
 ///
+/// `hashed` emits `lookup_or_fallback_h(fnv1a("dll"), fnv1a("Class"), fnv1a("field"), lit)`
+/// so no schema name strings appear in the caller's `.rdata`.
+///
 /// With `r#static`, emits `AtomicUsize` per offset + `__dynoffsets_register()`.
-/// Call the register fn after `init`, then `populate()` to fill the cells.
+/// Call the register fn after `init`, then `populate()` to fill the cells. (hashed ignored in static mode)
 pub use dynoffsets_macros::schema;
 
 /// `#[globals]` / `#[globals(r#static)]`
@@ -272,12 +275,37 @@ pub fn get_runtime_buttons() -> Option<&'static RuntimeButtons> {
     }
 }
 
+/// FNV-1a 32-bit hash (const-eval).
+///
+/// Use with `#[schema(hashed)]` (or `#[schema("client.dll", hashed)]`) so the
+/// macro emits only `u32` literals via `fnv1a("Name")`; the input strings
+/// exist only at compile time and do not appear in the final `.rdata`.
+pub const fn fnv1a(s: &str) -> u32 {
+    fnv1a_bytes(s.as_bytes())
+}
+
+/// Internal byte slice variant.
+pub(crate) const fn fnv1a_bytes(bytes: &[u8]) -> u32 {
+    let mut hash: u32 = 0x811c9dc5;
+    let prime: u32 = 0x01000193;
+    let mut i = 0;
+    while i < bytes.len() {
+        hash ^= bytes[i] as u32;
+        hash = hash.wrapping_mul(prime);
+        i += 1;
+    }
+    hash
+}
+
 /// Internal helper used by the `#[schema]` macro.
 ///
 /// Returns the runtime offset if the schema walker found it, otherwise `fallback`.
 #[inline]
 pub fn lookup_or_fallback(module: &str, class: &str, field: &str, fallback: usize) -> usize {
-    try_lookup_offset(module, class, field).unwrap_or(fallback)
+    let mh = fnv1a(module);
+    let ch = fnv1a(class);
+    let fh = fnv1a(field);
+    lookup_or_fallback_h(mh, ch, fh, fallback)
 }
 
 /// Internal helper used by the cached `#[schema]` accessor.
@@ -287,13 +315,36 @@ pub fn lookup_or_fallback(module: &str, class: &str, field: &str, fallback: usiz
 /// (e.g. schema system not yet populated) does not latch the literal fallback.
 #[inline]
 pub fn try_lookup_offset(module: &str, class: &str, field: &str) -> Option<usize> {
+    let mh = fnv1a(module);
+    let ch = fnv1a(class);
+    let fh = fnv1a(field);
+    try_lookup_offset_h(mh, ch, fh)
+}
+
+/// Hash-keyed variant of [`lookup_or_fallback`].
+///
+/// Intended for `#[schema(hashed)]` emission so no `&str` literals reach the
+/// caller's `.rdata`. The three hashes are produced at compile time by `fnv1a`.
+#[inline]
+pub fn lookup_or_fallback_h(
+    dll_hash: u32,
+    class_hash: u32,
+    field_hash: u32,
+    fallback: usize,
+) -> usize {
+    try_lookup_offset_h(dll_hash, class_hash, field_hash).unwrap_or(fallback)
+}
+
+/// Hash-keyed variant of [`try_lookup_offset`].
+#[inline]
+pub fn try_lookup_offset_h(dll_hash: u32, class_hash: u32, field_hash: u32) -> Option<usize> {
     #[cfg(feature = "runtime")]
     {
-        walker::lookup_offset(module, class, field).map(|off| off as usize)
+        walker::lookup_offset_h(dll_hash, class_hash, field_hash).map(|off| off as usize)
     }
     #[cfg(not(feature = "runtime"))]
     {
-        let _ = (module, class, field);
+        let _ = (dll_hash, class_hash, field_hash);
         None
     }
 }

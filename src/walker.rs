@@ -4,7 +4,7 @@
 //! scopes and class bindings to resolve field offsets for the `#[schema]`
 //! macro.
 
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::vec;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
@@ -69,8 +69,8 @@ const FIELD_STRIDE: usize = 0x20;
 static SCHEMA_SYSTEM: AtomicUsize = AtomicUsize::new(0);
 static RESOLVED: AtomicBool = AtomicBool::new(false);
 
-type Key = (String, String, String);
-type ClassKey = (String, String);
+type Key = (u32, u32, u32);
+type ClassKey = (u32, u32);
 
 fn cache() -> &'static Mutex<HashMap<Key, u32>> {
     static C: OnceCell<Mutex<HashMap<Key, u32>>> = OnceCell::new();
@@ -120,37 +120,44 @@ fn cstr(addr: usize, max: usize) -> Option<String> {
 }
 
 pub fn lookup_offset(module: &str, class: &str, field: &str) -> Option<u32> {
+    let mh = crate::fnv1a(module);
+    let ch = crate::fnv1a(class);
+    let fh = crate::fnv1a(field);
+    lookup_offset_h(mh, ch, fh)
+}
+
+/// Hash-keyed lookup (no `String` keys on hot path; strings from target memory only).
+pub fn lookup_offset_h(dll_hash: u32, class_hash: u32, field_hash: u32) -> Option<u32> {
     {
         let g = cache().lock();
-        if let Some(&o) = g.get(&(module.to_string(), class.to_string(), field.to_string())) {
+        if let Some(&o) = g.get(&(dll_hash, class_hash, field_hash)) {
             return Some(o);
         }
     }
-    let off = lookup_uncached(module, class, field)?;
-    cache().lock().insert(
-        (module.to_string(), class.to_string(), field.to_string()),
-        off,
-    );
+    let off = lookup_uncached_h(dll_hash, class_hash, field_hash)?;
+    cache()
+        .lock()
+        .insert((dll_hash, class_hash, field_hash), off);
     Some(off)
 }
 
-fn lookup_uncached(m: &str, c: &str, f: &str) -> Option<u32> {
-    let scope = type_scope(m)?;
-    let cls = resolve_class(m, scope, c)?;
-    field_off(m, scope, cls, f, 0)
+fn lookup_uncached_h(dll_h: u32, class_h: u32, field_h: u32) -> Option<u32> {
+    let scope = type_scope_h(dll_h)?;
+    let cls = resolve_class_h(dll_h, scope, class_h)?;
+    field_off_h(dll_h, scope, cls, field_h, 0)
 }
 
-fn resolve_class(module: &str, scope: usize, name: &str) -> Option<usize> {
-    let key = (module.to_string(), name.to_string());
+fn resolve_class_h(dll_h: u32, scope: usize, class_h: u32) -> Option<usize> {
+    let key = (dll_h, class_h);
     if let Some(&b) = class_cache().lock().get(&key) {
         return Some(b);
     }
-    let b = find_class(scope, name)?;
+    let b = find_class_h(scope, class_h)?;
     class_cache().lock().insert(key, b);
     Some(b)
 }
 
-fn type_scope(module: &str) -> Option<usize> {
+fn type_scope_h(dll_h: u32) -> Option<usize> {
     let ss = schema_system()?;
     let vec = ss + SS_TYPE_SCOPES;
     let cnt = mem::read_u32_off(vec, VEC_COUNT)? as usize;
@@ -164,8 +171,11 @@ fn type_scope(module: &str) -> Option<usize> {
         }
         let name_p = ptr + TS_NAME;
         if let Some(n) = cstr(name_p, TS_NAME_LEN) {
-            if n == module || n == module.trim_end_matches(".dll") || format!("{}.dll", n) == module
-            {
+            // Normalize for .dll suffix so fnv1a("client") and fnv1a("client.dll") both work
+            let base = n.trim_end_matches(".dll");
+            let h_base = crate::fnv1a(base);
+            let h_full = crate::fnv1a(&alloc::format!("{}.dll", base));
+            if h_base == dll_h || h_full == dll_h {
                 return Some(ptr);
             }
         }
@@ -173,10 +183,10 @@ fn type_scope(module: &str) -> Option<usize> {
     None
 }
 
-fn find_class(scope: usize, name: &str) -> Option<usize> {
+fn find_class_h(scope: usize, class_h: u32) -> Option<usize> {
     let mut found = None;
     walk_classes(scope, |n, b| {
-        if n == name {
+        if crate::fnv1a(n) == class_h {
             found = Some(b);
             false
         } else {
@@ -264,8 +274,8 @@ where
     }
 }
 
-fn field_off(module: &str, scope: usize, cls: usize, want: &str, depth: usize) -> Option<u32> {
-    if let Some(off) = field_off_direct(cls, want) {
+fn field_off_h(dll_h: u32, scope: usize, cls: usize, want_h: u32, depth: usize) -> Option<u32> {
+    if let Some(off) = field_off_direct_h(cls, want_h) {
         return Some(off);
     }
     if depth >= MAX_BASE_DEPTH {
@@ -283,16 +293,16 @@ fn field_off(module: &str, scope: usize, cls: usize, want: &str, depth: usize) -
     if name_ptr == 0 {
         return None;
     }
-    let parent_name = mem::read_cstring(name_ptr, MAX_NAME)?;
-    let parent_cls = resolve_class(module, scope, &parent_name)?;
+    let parent_h = mem::read_cstring_hash(name_ptr, MAX_NAME)?;
+    let parent_cls = resolve_class_h(dll_h, scope, parent_h)?;
     if parent_cls == cls {
         // Self-referential parent — bail rather than recurse forever.
         return None;
     }
-    field_off(module, scope, parent_cls, want, depth + 1)
+    field_off_h(dll_h, scope, parent_cls, want_h, depth + 1)
 }
 
-fn field_off_direct(cls: usize, want: &str) -> Option<u32> {
+fn field_off_direct_h(cls: usize, want_h: u32) -> Option<u32> {
     let cnt = mem::read_i16_off(cls, CLASS_FIELD_COUNT).unwrap_or(0) as usize;
     if cnt == 0 {
         return None;
@@ -305,8 +315,8 @@ fn field_off_direct(cls: usize, want: &str) -> Option<u32> {
         if np == 0 {
             continue;
         }
-        if let Some(n) = mem::read_cstring(np, MAX_NAME) {
-            if n == want {
+        if let Some(nh) = mem::read_cstring_hash(np, MAX_NAME) {
+            if nh == want_h {
                 return mem::read_u32_off(e, FIELD_OFF);
             }
         }
