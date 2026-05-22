@@ -48,6 +48,7 @@ const MEMPOOL_ALLOC: usize = 0x0C;
 const MEMPOOL_PEAK: usize = 0x10;
 const MEMPOOL_FREE_HEAD: usize = 0x20;
 
+const BUCKET_FIRST: usize = 0x08;
 const BUCKET_FIRST_UNC: usize = 0x10;
 const FIXED_NEXT: usize = 8;
 const FIXED_DATA: usize = 0x10;
@@ -143,7 +144,8 @@ fn type_scope(module: &str) -> Option<usize> {
         }
         let name_p = ptr + TS_NAME;
         if let Some(n) = cstr(name_p, TS_NAME_LEN) {
-            if n == module {
+            if n == module || n == module.trim_end_matches(".dll") || format!("{}.dll", n) == module
+            {
                 return Some(ptr);
             }
         }
@@ -180,24 +182,29 @@ where
 
     'outer: for b in 0..HASH_BUCKET_COUNT {
         let bucket = buckets + b * HASH_BUCKET_STRIDE;
-        let mut node = mem::read_usize_off(bucket, BUCKET_FIRST_UNC).unwrap_or(0);
-        let mut len = 0usize;
-        while node != 0 && len < MAX_CHAIN {
-            len += 1;
-            if let Some(binding) = mem::read_usize_off(node, FIXED_DATA) {
-                if binding != 0 {
-                    if !visit_binding(binding, &mut visit) {
-                        return;
+
+        // Walk both chains — the dumper uses first_uncommitted for allocated,
+        // but some live entries can be on the plain `first` list too.
+        for start_off in [BUCKET_FIRST, BUCKET_FIRST_UNC] {
+            let mut node = mem::read_usize_off(bucket, start_off).unwrap_or(0);
+            let mut len = 0usize;
+            while node != 0 && len < MAX_CHAIN {
+                len += 1;
+                if let Some(binding) = mem::read_usize_off(node, FIXED_DATA) {
+                    if binding != 0 {
+                        if !visit_binding(binding, &mut visit) {
+                            return;
+                        }
+                        seen += 1;
+                        if seen >= cap {
+                            break 'outer;
+                        }
                     }
-                    seen += 1;
-                    if seen >= cap {
-                        break 'outer;
-                    }
+                } else {
+                    break;
                 }
-            } else {
-                break;
+                node = mem::read_usize_off(node, FIXED_NEXT).unwrap_or(0);
             }
-            node = mem::read_usize_off(node, FIXED_NEXT).unwrap_or(0);
         }
     }
 
@@ -223,7 +230,6 @@ where
         blob = mem::read_usize_off(blob, BLOB_NEXT).unwrap_or(0);
     }
 }
-
 fn visit_binding<F>(binding: usize, v: &mut F) -> bool
 where
     F: FnMut(&str, usize) -> bool,
