@@ -38,10 +38,14 @@ pub fn read_cstring(addr: usize, max_len: usize) -> Option<String> {
     process()?.read_cstring(addr, max_len)
 }
 
+/// Read a NUL-terminated C string from the target and return its `(fnv1a_hash, byte_len)`.
+///
+/// `byte_len` is the number of bytes before the first NUL, saturating at `max_len` and at `u16::MAX`.
 #[inline]
-pub fn read_cstring_hash(addr: usize, max_len: usize) -> Option<u32> {
+pub fn read_cstring_hash_len(addr: usize, max_len: usize) -> Option<(u32, u16)> {
     let mut buf = alloc::vec![0u8; max_len];
     process()?.read_bytes(addr, &mut buf)?;
     let end = buf.iter().position(|&b| b == 0).unwrap_or(max_len);
-    Some(crate::fnv1a_bytes(&buf[..end]))
+    let len = core::cmp::min(end, u16::MAX as usize) as u16;
+    Some((crate::fnv1a_bytes(&buf[..end]), len))
 }
