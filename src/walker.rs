@@ -48,7 +48,6 @@ const MEMPOOL_ALLOC: usize = 0x0C;
 const MEMPOOL_PEAK: usize = 0x10;
 const MEMPOOL_FREE_HEAD: usize = 0x20;
 
-const BUCKET_FIRST: usize = 0x08;
 const BUCKET_FIRST_UNC: usize = 0x10;
 const FIXED_NEXT: usize = 8;
 const FIXED_DATA: usize = 0x10;
@@ -58,6 +57,10 @@ const BLOB_DATA: usize = 0x10;
 const CLASS_NAME: usize = 8;
 const CLASS_FIELD_COUNT: usize = 0x24;
 const CLASS_FIELDS: usize = 0x30;
+const CLASS_BASE_CLASSES: usize = 0x40;
+const BASE_INFO_CLASS: usize = 0x18;
+const BASE_CLASS_NAME: usize = 0x10;
+const MAX_BASE_DEPTH: usize = 16;
 
 const FIELD_NAME: usize = 0;
 const FIELD_OFF: usize = 0x10;
@@ -67,9 +70,15 @@ static SCHEMA_SYSTEM: AtomicUsize = AtomicUsize::new(0);
 static RESOLVED: AtomicBool = AtomicBool::new(false);
 
 type Key = (String, String, String);
+type ClassKey = (String, String);
 
 fn cache() -> &'static Mutex<HashMap<Key, u32>> {
     static C: OnceCell<Mutex<HashMap<Key, u32>>> = OnceCell::new();
+    C.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn class_cache() -> &'static Mutex<HashMap<ClassKey, usize>> {
+    static C: OnceCell<Mutex<HashMap<ClassKey, usize>>> = OnceCell::new();
     C.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
@@ -78,6 +87,7 @@ pub(crate) fn _test_reset_schema_system() {
     SCHEMA_SYSTEM.store(0, Ordering::Release);
     RESOLVED.store(false, Ordering::Release);
     cache().lock().clear();
+    class_cache().lock().clear();
 }
 
 #[cfg(test)]
@@ -126,8 +136,18 @@ pub fn lookup_offset(module: &str, class: &str, field: &str) -> Option<u32> {
 
 fn lookup_uncached(m: &str, c: &str, f: &str) -> Option<u32> {
     let scope = type_scope(m)?;
-    let cls = find_class(scope, c)?;
-    field_off(cls, f)
+    let cls = resolve_class(m, scope, c)?;
+    field_off(m, scope, cls, f, 0)
+}
+
+fn resolve_class(module: &str, scope: usize, name: &str) -> Option<usize> {
+    let key = (module.to_string(), name.to_string());
+    if let Some(&b) = class_cache().lock().get(&key) {
+        return Some(b);
+    }
+    let b = find_class(scope, name)?;
+    class_cache().lock().insert(key, b);
+    Some(b)
 }
 
 fn type_scope(module: &str) -> Option<usize> {
@@ -183,28 +203,24 @@ where
     'outer: for b in 0..HASH_BUCKET_COUNT {
         let bucket = buckets + b * HASH_BUCKET_STRIDE;
 
-        // Walk both chains — the dumper uses first_uncommitted for allocated,
-        // but some live entries can be on the plain `first` list too.
-        for start_off in [BUCKET_FIRST, BUCKET_FIRST_UNC] {
-            let mut node = mem::read_usize_off(bucket, start_off).unwrap_or(0);
-            let mut len = 0usize;
-            while node != 0 && len < MAX_CHAIN {
-                len += 1;
-                if let Some(binding) = mem::read_usize_off(node, FIXED_DATA) {
-                    if binding != 0 {
-                        if !visit_binding(binding, &mut visit) {
-                            return;
-                        }
-                        seen += 1;
-                        if seen >= cap {
-                            break 'outer;
-                        }
+        let mut node = mem::read_usize_off(bucket, BUCKET_FIRST_UNC).unwrap_or(0);
+        let mut len = 0usize;
+        while node != 0 && len < MAX_CHAIN {
+            len += 1;
+            if let Some(binding) = mem::read_usize_off(node, FIXED_DATA) {
+                if binding != 0 {
+                    if !visit_binding(binding, &mut visit) {
+                        return;
                     }
-                } else {
-                    break;
+                    seen += 1;
+                    if seen >= cap {
+                        break 'outer;
+                    }
                 }
-                node = mem::read_usize_off(node, FIXED_NEXT).unwrap_or(0);
+            } else {
+                break;
             }
+            node = mem::read_usize_off(node, FIXED_NEXT).unwrap_or(0);
         }
     }
 
@@ -248,8 +264,39 @@ where
     }
 }
 
-fn field_off(cls: usize, want: &str) -> Option<u32> {
-    let cnt = mem::read_i16_off(cls, CLASS_FIELD_COUNT)? as usize;
+fn field_off(module: &str, scope: usize, cls: usize, want: &str, depth: usize) -> Option<u32> {
+    if let Some(off) = field_off_direct(cls, want) {
+        return Some(off);
+    }
+    if depth >= MAX_BASE_DEPTH {
+        return None;
+    }
+    let base_info = mem::read_usize_off(cls, CLASS_BASE_CLASSES).unwrap_or(0);
+    if base_info == 0 {
+        return None;
+    }
+    let parent_lite = mem::read_usize_off(base_info, BASE_INFO_CLASS).unwrap_or(0);
+    if parent_lite == 0 {
+        return None;
+    }
+    let name_ptr = mem::read_usize_off(parent_lite, BASE_CLASS_NAME).unwrap_or(0);
+    if name_ptr == 0 {
+        return None;
+    }
+    let parent_name = mem::read_cstring(name_ptr, MAX_NAME)?;
+    let parent_cls = resolve_class(module, scope, &parent_name)?;
+    if parent_cls == cls {
+        // Self-referential parent — bail rather than recurse forever.
+        return None;
+    }
+    field_off(module, scope, parent_cls, want, depth + 1)
+}
+
+fn field_off_direct(cls: usize, want: &str) -> Option<u32> {
+    let cnt = mem::read_i16_off(cls, CLASS_FIELD_COUNT).unwrap_or(0) as usize;
+    if cnt == 0 {
+        return None;
+    }
     let base = mem::read_ptr(cls, CLASS_FIELDS)?;
 
     for i in 0..cnt {
