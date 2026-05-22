@@ -283,7 +283,7 @@ pub fn lookup_or_fallback(module: &str, class: &str, field: &str, fallback: usiz
 pub fn try_lookup_offset(module: &str, class: &str, field: &str) -> Option<usize> {
     #[cfg(feature = "runtime")]
     {
-        return walker::lookup_offset(module, class, field).map(|off| off as usize);
+        walker::lookup_offset(module, class, field).map(|off| off as usize)
     }
     #[cfg(not(feature = "runtime"))]
     {
