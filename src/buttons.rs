@@ -70,11 +70,15 @@ pub fn discover_buttons() -> RuntimeButtons {
     };
 
     for _ in 0..MAX_CHAIN {
-        let Some(np) = mem::read_usize_off(node, NAME_OFF) else { break };
+        let Some(np) = mem::read_usize_off(node, NAME_OFF) else {
+            break;
+        };
         if np == 0 {
             break;
         }
-        let Some(name) = mem::read_cstring(np, MAX_NAME) else { break };
+        let Some(name) = mem::read_cstring(np, MAX_NAME) else {
+            break;
+        };
 
         if let Some(state) = node.checked_add(STATE_OFF) {
             out.map.insert(name.to_string(), state);

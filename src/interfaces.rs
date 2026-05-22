@@ -77,12 +77,20 @@ pub fn discover_interfaces() -> RuntimeInterfaces {
 /// control the order. The `#[interfaces]` macro ultimately calls this.
 pub fn discover_interfaces_in(modules: &[&str]) -> RuntimeInterfaces {
     let mut out = RuntimeInterfaces::default();
-    let Some(p) = crate::process() else { return out };
+    let Some(p) = crate::process() else {
+        return out;
+    };
 
     for &m in modules {
-        let Some(ci) = p.get_proc_address(m, obfstr!("CreateInterface")) else { continue };
-        let Some(cell) = resolve_rip32_at(ci, 3) else { continue };
-        let Some(head) = mem::read_usize(cell) else { continue };
+        let Some(ci) = p.get_proc_address(m, obfstr!("CreateInterface")) else {
+            continue;
+        };
+        let Some(cell) = resolve_rip32_at(ci, 3) else {
+            continue;
+        };
+        let Some(head) = mem::read_usize(cell) else {
+            continue;
+        };
         if head == 0 {
             continue;
         }
@@ -106,8 +114,12 @@ fn walk(head: usize) -> Vec<(String, usize)> {
         if node == 0 {
             break;
         }
-        let Some(create) = mem::read_usize_off(node, REG_CREATE) else { break };
-        let Some(namep) = mem::read_usize_off(node, REG_NAME) else { break };
+        let Some(create) = mem::read_usize_off(node, REG_CREATE) else {
+            break;
+        };
+        let Some(namep) = mem::read_usize_off(node, REG_NAME) else {
+            break;
+        };
         let next = mem::read_usize_off(node, REG_NEXT).unwrap_or(0);
 
         if create != 0 && namep != 0 {

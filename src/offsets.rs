@@ -41,6 +41,55 @@ pub struct RuntimeGlobals {
     pub dw_sound_system_engine_view_data: Option<usize>,
 }
 
+impl RuntimeGlobals {
+    /// Lookup by name. Used by `r#static` globals via `populate`.
+    pub fn get(&self, name: &str) -> Option<usize> {
+        match name {
+            "dw_csgo_input" => self.dw_csgo_input,
+            "dw_entity_list" => self.dw_entity_list,
+            "dw_game_entity_system" => self.dw_game_entity_system,
+            "dw_game_entity_system_highest_entity_index" => {
+                self.dw_game_entity_system_highest_entity_index
+            }
+            "dw_game_rules" => self.dw_game_rules,
+            "dw_global_vars" => self.dw_global_vars,
+            "dw_glow_manager" => self.dw_glow_manager,
+            "dw_local_player_controller" => self.dw_local_player_controller,
+            "dw_local_player_pawn" => self.dw_local_player_pawn,
+            "dw_planted_c4" => self.dw_planted_c4,
+            "dw_prediction" => self.dw_prediction,
+            "dw_sensitivity" => self.dw_sensitivity,
+            "dw_sensitivity_sensitivity" => self.dw_sensitivity_sensitivity,
+            "dw_view_angles" => self.dw_view_angles,
+            "dw_view_matrix" => self.dw_view_matrix,
+            "dw_view_render" => self.dw_view_render,
+            "dw_weapon_c4" => self.dw_weapon_c4,
+            "dw_build_number" => self.dw_build_number,
+            "dw_network_game_client" => self.dw_network_game_client,
+            "dw_network_game_client_client_tick_count" => {
+                self.dw_network_game_client_client_tick_count
+            }
+            "dw_network_game_client_delta_tick" => self.dw_network_game_client_delta_tick,
+            "dw_network_game_client_is_background_map" => {
+                self.dw_network_game_client_is_background_map
+            }
+            "dw_network_game_client_local_player" => self.dw_network_game_client_local_player,
+            "dw_network_game_client_max_clients" => self.dw_network_game_client_max_clients,
+            "dw_network_game_client_server_tick_count" => {
+                self.dw_network_game_client_server_tick_count
+            }
+            "dw_network_game_client_sign_on_state" => self.dw_network_game_client_sign_on_state,
+            "dw_window_height" => self.dw_window_height,
+            "dw_window_width" => self.dw_window_width,
+            "dw_input_system" => self.dw_input_system,
+            "dw_game_types" => self.dw_game_types,
+            "dw_sound_system" => self.dw_sound_system,
+            "dw_sound_system_engine_view_data" => self.dw_sound_system_engine_view_data,
+            _ => None,
+        }
+    }
+}
+
 macro_rules! b {
     (?) => {
         None
@@ -64,8 +113,11 @@ pub fn discover_globals() -> RuntimeGlobals {
         find_pattern_u32("client.dll", sig!(0xF2 0x42 0x0F 0x10 0x84 0x28 ? ? ? ?), 6)
             .map(|i| csgo_input.wrapping_add(i as usize))
     });
-    let dw_entity_list =
-        find_pattern_rip32("client.dll", sig!(0x48 0x89 0x0D ? ? ? ? 0xE9 ? ? ? ? 0xCC), 3);
+    let dw_entity_list = find_pattern_rip32(
+        "client.dll",
+        sig!(0x48 0x89 0x0D ? ? ? ? 0xE9 ? ? ? ? 0xCC),
+        3,
+    );
     let dw_game_entity_system = find_pattern_rip32(
         "client.dll",
         sig!(0x48 0x8B 0x1D ? ? ? ? 0x48 0x89 0x1D ? ? ? ? 0x4C 0x63 0xB3),
@@ -99,20 +151,30 @@ pub fn discover_globals() -> RuntimeGlobals {
         3,
     );
     let dw_local_player_pawn = dw_prediction.and_then(|prediction| {
-        find_pattern_u32("client.dll", sig!(0x4C 0x39 0xB6 ? ? ? ? 0x74 ? 0x44 0x88 0xBE), 3)
-            .map(|i| prediction.wrapping_add(i as usize))
+        find_pattern_u32(
+            "client.dll",
+            sig!(0x4C 0x39 0xB6 ? ? ? ? 0x74 ? 0x44 0x88 0xBE),
+            3,
+        )
+        .map(|i| prediction.wrapping_add(i as usize))
     });
 
-    let dw_sensitivity =
-        find_pattern_rip32("client.dll", sig!(0x48 0x8D 0x0D ? ? ? ? 0x66 0x0F 0x6E 0xCD), 3);
+    let dw_sensitivity = find_pattern_rip32(
+        "client.dll",
+        sig!(0x48 0x8D 0x0D ? ? ? ? 0x66 0x0F 0x6E 0xCD),
+        3,
+    );
     let dw_sensitivity_sensitivity = find_pattern_u8(
         "client.dll",
         sig!(0x48 0x8D 0x7E ? 0x48 0x0F 0xBA 0xE0 ? 0x72 ? 0x85 0xD2 0x49 0x0F 0x4F 0xFF),
         3,
     )
     .map(|v| v as usize);
-    let dw_view_matrix =
-        find_pattern_rip32("client.dll", sig!(0x48 0x8D 0x0D ? ? ? ? 0x48 0xC1 0xE0 0x06), 3);
+    let dw_view_matrix = find_pattern_rip32(
+        "client.dll",
+        sig!(0x48 0x8D 0x0D ? ? ? ? 0x48 0xC1 0xE0 0x06),
+        3,
+    );
     let dw_view_render = find_pattern_rip32(
         "client.dll",
         sig!(0x48 0x89 0x05 ? ? ? ? 0x48 0x8B 0xC8 0x48 0x85 0xC0),
@@ -137,9 +199,12 @@ pub fn discover_globals() -> RuntimeGlobals {
         2,
     )
     .map(|v| v as usize);
-    let dw_network_game_client_delta_tick =
-        find_pattern_u32("engine2.dll", sig!(0x4C 0x8D 0xB7 ? ? ? ? 0x4C 0x89 0x7C 0x24), 3)
-            .map(|v| v as usize);
+    let dw_network_game_client_delta_tick = find_pattern_u32(
+        "engine2.dll",
+        sig!(0x4C 0x8D 0xB7 ? ? ? ? 0x4C 0x89 0x7C 0x24),
+        3,
+    )
+    .map(|v| v as usize);
     let dw_network_game_client_is_background_map = find_pattern_u32(
         "engine2.dll",
         sig!(0x0F 0xB6 0x81 ? ? ? ? 0xC3 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0x0F 0xB6 0x81 ? ? ? ? 0xC3 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0x40 0x53),
@@ -164,9 +229,12 @@ pub fn discover_globals() -> RuntimeGlobals {
         2,
     )
     .map(|v| v as usize);
-    let dw_network_game_client_sign_on_state =
-        find_pattern_u32("engine2.dll", sig!(0x44 0x8B 0x81 ? ? ? ? 0x48 0x8D 0x0D), 3)
-            .map(|v| v as usize);
+    let dw_network_game_client_sign_on_state = find_pattern_u32(
+        "engine2.dll",
+        sig!(0x44 0x8B 0x81 ? ? ? ? 0x48 0x8D 0x0D),
+        3,
+    )
+    .map(|v| v as usize);
     let dw_window_height = find_pattern_rip32("engine2.dll", sig!(0x8B 0x05 ? ? ? ? 0x89 0x03), 2);
     let dw_window_width = find_pattern_rip32("engine2.dll", sig!(0x8B 0x05 ? ? ? ? 0x89 0x07), 2);
 

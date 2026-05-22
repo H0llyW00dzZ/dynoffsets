@@ -17,9 +17,53 @@ use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec;
 
-pub use dynoffsets_macros::{buttons, globals, interfaces, schema};
+/// `#[schema]` / `#[schema("client.dll")]` / `#[schema(false)]` / `#[schema(..., r#static)]`
+///
+/// Turns each `pub const NAME: usize = LIT;` into `pub fn NAME() -> usize`.
+/// Returns live value when runtime discovery succeeds, else the literal.
+///
+/// With `r#static`, emits `AtomicUsize` per offset + `__dynoffsets_register()`.
+/// Call the register fn after `init`, then `populate()` to fill the cells.
+pub use dynoffsets_macros::schema;
 
+/// `#[globals]` / `#[globals(r#static)]`
+///
+/// Turns `pub const NAME: usize = LIT;` into `pub fn NAME() -> usize`
+/// returning the live global or the literal fallback.
+///
+/// `r#static` mode: `AtomicUsize` cells + register fn; populate after init.
+pub use dynoffsets_macros::globals;
+
+/// `#[interfaces]` / `#[interfaces("dll")]` / `#[interfaces(false)]` / `#[interfaces(..., r#static)]`
+///
+/// Rewrites interface consts to fns returning the live pointer or literal.
+///
+/// `r#static`: per-item `AtomicUsize` + register fn; fill via `populate()`.
+pub use dynoffsets_macros::interfaces;
+
+/// `#[buttons]` / `#[buttons(r#static)]`
+///
+/// Rewrites button consts to fns returning live button state addr or literal.
+///
+/// `r#static`: `AtomicUsize` per button + register fn; populate after init.
+pub use dynoffsets_macros::buttons;
+
+#[path = "static.rs"]
+mod r#static;
 mod sync;
+
+pub use r#static::{populate, PopulateStats, Slot};
+
+// Hidden re-exports invoked by macro-generated `__dynoffsets_register()`
+// functions. Not part of the stable API; do not call directly.
+#[doc(hidden)]
+pub use r#static::register_buttons as __register_buttons_static;
+#[doc(hidden)]
+pub use r#static::register_globals as __register_globals_static;
+#[doc(hidden)]
+pub use r#static::register_interfaces as __register_interfaces_static;
+#[doc(hidden)]
+pub use r#static::register_schema as __register_schema_static;
 
 #[cfg(all(test, feature = "runtime"))]
 mod mock;
@@ -79,6 +123,15 @@ pub struct RuntimeGlobals {
     pub dw_input_system: Option<usize>,
     pub dw_game_types: Option<usize>,
     pub dw_sound_system: Option<usize>,
+}
+
+#[cfg(not(feature = "runtime"))]
+impl RuntimeGlobals {
+    /// Stub `get` for the no-runtime build: always returns `None`.
+    #[inline]
+    pub fn get(&self, _name: &str) -> Option<usize> {
+        None
+    }
 }
 
 /// Stub when `runtime` is disabled.

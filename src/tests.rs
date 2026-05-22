@@ -74,7 +74,10 @@ fn init_is_idempotent() {
     let _g = setup();
     init(DummyProc);
     populate(|s| s.add_module("client.dll", 0x1234));
-    assert_eq!(crate::process().unwrap().module_base("client.dll"), Some(0x1234));
+    assert_eq!(
+        crate::process().unwrap().module_base("client.dll"),
+        Some(0x1234)
+    );
 }
 
 #[test]
@@ -400,7 +403,10 @@ fn sigscan_find_pattern_u32_via_override_some_and_none() {
     let _g = setup();
     let pat = &[Some(0xCCu8)][..];
     sigscan::set_pattern_u32("m.dll", pat, 2, Some(0xDEAD_BEEF));
-    assert_eq!(sigscan::find_pattern_u32("m.dll", pat, 2), Some(0xDEAD_BEEF));
+    assert_eq!(
+        sigscan::find_pattern_u32("m.dll", pat, 2),
+        Some(0xDEAD_BEEF)
+    );
 
     let pat2 = &[Some(0xDDu8)][..];
     sigscan::set_pattern_u32("m.dll", pat2, 2, None);
@@ -413,7 +419,10 @@ fn sigscan_find_pattern_u32_reads_unaligned_from_match_site() {
     let addr = imm32_at(3, 0xCAFE_BABE);
     let pat = &[Some(0xEEu8)][..];
     sigscan::set_pattern("m.dll", pat, Some(addr));
-    assert_eq!(sigscan::find_pattern_u32("m.dll", pat, 3), Some(0xCAFE_BABE));
+    assert_eq!(
+        sigscan::find_pattern_u32("m.dll", pat, 3),
+        Some(0xCAFE_BABE)
+    );
 }
 
 #[test]
@@ -502,8 +511,17 @@ fn discover_globals_all_none_when_no_matches() {
 #[test]
 fn discover_globals_resolves_one_known_pattern() {
     let _g = setup();
-    let pat: &[Option<u8>] =
-        &[Some(0x48), Some(0x89), Some(0x05), None, None, None, None, Some(0x33), Some(0xC0)];
+    let pat: &[Option<u8>] = &[
+        Some(0x48),
+        Some(0x89),
+        Some(0x05),
+        None,
+        None,
+        None,
+        None,
+        Some(0x33),
+        Some(0xC0),
+    ];
     sigscan::set_pattern_rip32("inputsystem.dll", pat, 3, Some(0xFEED_FACE_usize));
     let r = offsets::discover_globals();
     assert_eq!(r.dw_input_system, Some(0xFEED_FACE_usize));
@@ -659,8 +677,17 @@ fn discover_globals_local_player_pawn_none_when_prediction_missing() {
 #[test]
 fn discover_globals_resolves_u32_imm_highest_entity_index() {
     let _g = setup();
-    let pat: &[Option<u8>] =
-        &[Some(0xFF), Some(0x81), None, None, None, None, Some(0x48), Some(0x85), Some(0xD2)];
+    let pat: &[Option<u8>] = &[
+        Some(0xFF),
+        Some(0x81),
+        None,
+        None,
+        None,
+        None,
+        Some(0x48),
+        Some(0x85),
+        Some(0xD2),
+    ];
     sigscan::set_pattern_u32("client.dll", pat, 2, Some(0x2090));
     let r = offsets::discover_globals();
     assert_eq!(r.dw_game_entity_system_highest_entity_index, Some(0x2090));
@@ -1195,14 +1222,20 @@ fn populate_schema_layout() -> SchemaLayout {
     });
 
     walker::_test_set_schema_system(ss_base);
-    SchemaLayout { ss_base, fields_base }
+    SchemaLayout {
+        ss_base,
+        fields_base,
+    }
 }
 
 #[test]
 fn walker_happy_path_resolves_field_offset() {
     let _g = setup();
     populate_schema_layout();
-    assert_eq!(walker::lookup_offset("client.dll", "C_BaseEntity", "m_iHealth"), Some(0x42));
+    assert_eq!(
+        walker::lookup_offset("client.dll", "C_BaseEntity", "m_iHealth"),
+        Some(0x42)
+    );
 }
 
 #[test]
@@ -1340,7 +1373,10 @@ fn walker_walks_free_blob_chain() {
     });
 
     walker::_test_set_schema_system(ss_base);
-    assert_eq!(walker::lookup_offset("client.dll", "FromFreeChain", "m_x"), Some(0x84));
+    assert_eq!(
+        walker::lookup_offset("client.dll", "FromFreeChain", "m_x"),
+        Some(0x84)
+    );
 }
 
 #[test]
@@ -1437,7 +1473,10 @@ fn walker_skips_scope_with_unreadable_name() {
 fn lookup_or_fallback_returns_runtime_when_present() {
     let _g = setup();
     populate_schema_layout();
-    assert_eq!(lookup_or_fallback("client.dll", "C_BaseEntity", "m_iHealth", 0xDEAD), 0x42);
+    assert_eq!(
+        lookup_or_fallback("client.dll", "C_BaseEntity", "m_iHealth", 0xDEAD),
+        0x42
+    );
 }
 
 #[test]
@@ -1489,7 +1528,10 @@ fn walker_allocated_walk_advances_to_next_node() {
         s.write_cstr(fn_name, "m_target");
     });
     walker::_test_set_schema_system(ss_base);
-    assert_eq!(walker::lookup_offset("client.dll", "C_Second", "m_target"), Some(0x77));
+    assert_eq!(
+        walker::lookup_offset("client.dll", "C_Second", "m_target"),
+        Some(0x77)
+    );
 }
 
 #[test]
@@ -1667,7 +1709,278 @@ fn walker_free_chain_advances_through_multiple_blobs() {
         s.write_cstr(fn_name, "m_w");
     });
     walker::_test_set_schema_system(ss_base);
-    assert_eq!(walker::lookup_offset("client.dll", "Wanted", "m_w"), Some(0x99));
+    assert_eq!(
+        walker::lookup_offset("client.dll", "Wanted", "m_w"),
+        Some(0x99)
+    );
+}
+
+use core::sync::atomic::{AtomicUsize, Ordering};
+
+use crate::r#static::{self as static_mod, populate as static_populate};
+
+#[test]
+fn slots_register_appends_each_category() {
+    let _g = setup();
+
+    static GS: &[static_mod::Slot] = &[];
+    static SS: &[static_mod::Slot] = &[];
+    static IS: &[static_mod::Slot] = &[];
+    static BS: &[static_mod::Slot] = &[];
+
+    static_mod::register_globals(GS);
+    static_mod::register_schema("client.dll", "C_Foo", SS);
+    static_mod::register_interfaces("server.dll", IS);
+    static_mod::register_buttons(BS);
+
+    let (g, s, i, b) = static_mod::_test_counts();
+    assert_eq!((g, s, i, b), (1, 1, 1, 1));
+}
+
+#[test]
+fn slots_register_globals_can_be_called_multiple_times() {
+    let _g = setup();
+    static A: &[static_mod::Slot] = &[];
+    static B: &[static_mod::Slot] = &[];
+    static_mod::register_globals(A);
+    static_mod::register_globals(B);
+    assert_eq!(static_mod::_test_counts().0, 2);
+}
+
+#[test]
+fn slots_populate_with_no_registrations_returns_zero_stats() {
+    let _g = setup();
+    let stats = static_populate();
+    assert_eq!(stats, static_mod::PopulateStats::default());
+}
+
+#[test]
+fn slots_populate_writes_live_globals_into_atomic_slot() {
+    let _g = setup();
+    // Force a live discovered value for dw_input_system via the existing
+    // pattern override; this drives discover_globals() to return Some(...).
+    let pat: &[Option<u8>] = &[
+        Some(0x48),
+        Some(0x89),
+        Some(0x05),
+        None,
+        None,
+        None,
+        None,
+        Some(0x33),
+        Some(0xC0),
+    ];
+    sigscan::set_pattern_rip32("inputsystem.dll", pat, 3, Some(0xFEED_FACE_usize));
+
+    static SLOT: AtomicUsize = AtomicUsize::new(0xDEAD);
+    static SLOTS: &[static_mod::Slot] = &[("dw_input_system", &SLOT)];
+    static_mod::register_globals(SLOTS);
+
+    let stats = static_populate();
+    assert_eq!(stats.globals, 1);
+    assert_eq!(SLOT.load(Ordering::Relaxed), 0xFEED_FACE);
+}
+
+#[test]
+fn slots_populate_leaves_literal_when_global_name_unknown() {
+    let _g = setup();
+    static SLOT: AtomicUsize = AtomicUsize::new(0xAAAA);
+    static SLOTS: &[static_mod::Slot] = &[("dw_nothing_like_this_exists", &SLOT)];
+    static_mod::register_globals(SLOTS);
+    let stats = static_populate();
+    assert_eq!(stats.globals, 0);
+    assert_eq!(SLOT.load(Ordering::Relaxed), 0xAAAA);
+}
+
+#[test]
+fn slots_populate_leaves_literal_when_pattern_misses() {
+    let _g = setup();
+    // No pattern override for dw_input_system → its Option<usize> is None.
+    static SLOT: AtomicUsize = AtomicUsize::new(0xCAFE);
+    static SLOTS: &[static_mod::Slot] = &[("dw_input_system", &SLOT)];
+    static_mod::register_globals(SLOTS);
+    let stats = static_populate();
+    assert_eq!(stats.globals, 0);
+    assert_eq!(SLOT.load(Ordering::Relaxed), 0xCAFE);
+}
+
+#[test]
+fn slots_populate_writes_live_schema_into_atomic_slot() {
+    let _g = setup();
+    populate_schema_layout();
+
+    static SLOT: AtomicUsize = AtomicUsize::new(0xBEEF);
+    static FIELDS: &[static_mod::Slot] = &[("m_iHealth", &SLOT)];
+    static_mod::register_schema("client.dll", "C_BaseEntity", FIELDS);
+
+    let stats = static_populate();
+    assert_eq!(stats.schema, 1);
+    assert_eq!(SLOT.load(Ordering::Relaxed), 0x42);
+}
+
+#[test]
+fn slots_populate_leaves_literal_when_schema_lookup_misses() {
+    let _g = setup();
+    // No schema layout populated → walker can't find the class.
+    static SLOT: AtomicUsize = AtomicUsize::new(0x1111);
+    static FIELDS: &[static_mod::Slot] = &[("absent", &SLOT)];
+    static_mod::register_schema("client.dll", "C_NoSuch", FIELDS);
+    let stats = static_populate();
+    assert_eq!(stats.schema, 0);
+    assert_eq!(SLOT.load(Ordering::Relaxed), 0x1111);
+}
+
+#[test]
+fn slots_populate_writes_live_interfaces_into_atomic_slot() {
+    let _g = setup();
+    let (ci_inst, cell) = rel32_instr(0x200);
+    let (create_inst, inst) = rel32_instr(0x400);
+    let reg = 0xB1_0000usize;
+    let name_addr = 0xB2_0000usize;
+
+    populate(|s| {
+        s.add_export("server.dll", "CreateInterface", ci_inst);
+        s.write_usize(cell, reg);
+        s.write_usize(reg + 0x00, create_inst);
+        s.write_usize(reg + 0x08, name_addr);
+        s.write_usize(reg + 0x10, 0);
+        s.write_cstr(name_addr, "Source2Server001");
+    });
+
+    static SLOT: AtomicUsize = AtomicUsize::new(0xBAAD);
+    static IFACES: &[static_mod::Slot] = &[("Source2Server001", &SLOT)];
+    static_mod::register_interfaces("server.dll", IFACES);
+
+    let stats = static_populate();
+    assert_eq!(stats.interfaces, 1);
+    assert_eq!(SLOT.load(Ordering::Relaxed), inst);
+}
+
+#[test]
+fn slots_populate_writes_live_buttons_into_atomic_slot() {
+    let _g = setup();
+    let cell = 0x70_0000usize;
+    let node = 0x71_0000usize;
+    let name = 0x72_0000usize;
+    sigscan::set_pattern_rip32("client.dll", BTN_PATTERN, 3, Some(cell));
+    populate(|s| {
+        s.write_usize(cell, node);
+        s.write_usize(node + 0x08, name);
+        s.write_cstr(name, "in_jump");
+        s.write_usize(node + 0x88, 0);
+    });
+
+    static SLOT: AtomicUsize = AtomicUsize::new(0x9999);
+    static BUTTONS_SLOTS: &[static_mod::Slot] = &[("in_jump", &SLOT)];
+    static_mod::register_buttons(BUTTONS_SLOTS);
+
+    let stats = static_populate();
+    assert_eq!(stats.buttons, 1);
+    assert_eq!(SLOT.load(Ordering::Relaxed), node + 0x30);
+}
+
+#[test]
+fn slots_populate_is_idempotent() {
+    let _g = setup();
+    let pat: &[Option<u8>] = &[
+        Some(0x48),
+        Some(0x89),
+        Some(0x05),
+        None,
+        None,
+        None,
+        None,
+        Some(0x33),
+        Some(0xC0),
+    ];
+    sigscan::set_pattern_rip32("inputsystem.dll", pat, 3, Some(0xFEED_FACE_usize));
+
+    static SLOT: AtomicUsize = AtomicUsize::new(0);
+    static SLOTS: &[static_mod::Slot] = &[("dw_input_system", &SLOT)];
+    static_mod::register_globals(SLOTS);
+
+    let first = static_populate();
+    let second = static_populate();
+    assert_eq!(first, second);
+    assert_eq!(SLOT.load(Ordering::Relaxed), 0xFEED_FACE);
+}
+
+#[test]
+fn runtime_globals_get_known_field_returns_value() {
+    let g = offsets::RuntimeGlobals {
+        dw_input_system: Some(0x1234),
+        ..Default::default()
+    };
+    assert_eq!(g.get("dw_input_system"), Some(0x1234));
+}
+
+#[test]
+fn runtime_globals_get_known_field_returns_none_when_unset() {
+    let g = offsets::RuntimeGlobals::default();
+    assert_eq!(g.get("dw_input_system"), None);
+}
+
+#[test]
+fn runtime_globals_get_unknown_field_returns_none() {
+    let g = offsets::RuntimeGlobals::default();
+    assert_eq!(g.get("dw_does_not_exist"), None);
+}
+
+#[test]
+fn runtime_globals_get_covers_every_field_name() {
+    // Exercise every match arm so coverage stays at 100% for the dispatcher.
+    let names = [
+        "dw_csgo_input",
+        "dw_entity_list",
+        "dw_game_entity_system",
+        "dw_game_entity_system_highest_entity_index",
+        "dw_game_rules",
+        "dw_global_vars",
+        "dw_glow_manager",
+        "dw_local_player_controller",
+        "dw_local_player_pawn",
+        "dw_planted_c4",
+        "dw_prediction",
+        "dw_sensitivity",
+        "dw_sensitivity_sensitivity",
+        "dw_view_angles",
+        "dw_view_matrix",
+        "dw_view_render",
+        "dw_weapon_c4",
+        "dw_build_number",
+        "dw_network_game_client",
+        "dw_network_game_client_client_tick_count",
+        "dw_network_game_client_delta_tick",
+        "dw_network_game_client_is_background_map",
+        "dw_network_game_client_local_player",
+        "dw_network_game_client_max_clients",
+        "dw_network_game_client_server_tick_count",
+        "dw_network_game_client_sign_on_state",
+        "dw_window_height",
+        "dw_window_width",
+        "dw_input_system",
+        "dw_game_types",
+        "dw_sound_system",
+        "dw_sound_system_engine_view_data",
+    ];
+    let g = offsets::RuntimeGlobals::default();
+    for n in names {
+        assert_eq!(g.get(n), None, "{n}");
+    }
+}
+
+#[test]
+fn populate_stats_default_is_all_zero() {
+    let s = static_mod::PopulateStats::default();
+    assert_eq!(
+        s,
+        static_mod::PopulateStats {
+            globals: 0,
+            schema: 0,
+            interfaces: 0,
+            buttons: 0
+        }
+    );
 }
 
 #[test]
