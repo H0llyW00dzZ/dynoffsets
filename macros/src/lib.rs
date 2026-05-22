@@ -99,7 +99,7 @@ fn rewrite_schema_module(class_mod: &mut ItemMod, args: &Args) {
 /// `#[globals]`
 ///
 /// Turns `pub const NAME: usize = LIT;` into a function that returns the
-/// live pointer from [`RuntimeGlobals`] or the literal if discovery failed.
+/// live pointer from `RuntimeGlobals` (in the `dynoffsets` crate) or the literal if discovery failed.
 #[proc_macro_attribute]
 pub fn globals(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut module = parse_macro_input!(item as ItemMod);
