@@ -46,15 +46,15 @@ Recommended usage (with macros):
 ```rust
 #[schema]
 pub mod C_BaseEntity {
-    pub const m_iHealth: usize = 0x34C;
+    pub const m_iHealth: usize = 0xDEAD_BEEF;
 }
 
 #[globals]
 pub mod client_dll {
-    pub const dw_entity_list: usize = 0x250C5B0;
+    pub const dw_entity_list: usize = 0xDEAD_BEEF;
 }
 
-// Access as functions (live value or literal fallback)
+// Access as functions (live value or dead)
 let hp   = C_BaseEntity::m_iHealth();
 let list = client_dll::dw_entity_list();
 ```
