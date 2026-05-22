@@ -1,5 +1,9 @@
 //! Pattern-based discovery of engine globals (dw_* pointers).
 
+use alloc::string::{String, ToString};
+
+use obfstr::obfstr;
+
 use crate::sigscan::{find_pattern_rip32, find_pattern_u32, find_pattern_u8};
 
 /// RIP-resolved address, converted to a module-relative offset.
@@ -111,56 +115,70 @@ macro_rules! sig { ($($t:tt)*) => { &[$(b!($t)),*] }; }
 pub fn discover_globals() -> RuntimeGlobals {
     // Some people on UC will call this "AI slop" just because the line is long lol.
     // Funny how blind some of them are.
+
+    // Decode each DLL name once per call so the literals never appear in `.rdata`.
+    // Owned `String` so the value outlives `obfstr!`'s per-statement stack buffer.
+    let client: String = obfstr!("client.dll").to_string();
+    let engine2: String = obfstr!("engine2.dll").to_string();
+    let inputsystem: String = obfstr!("inputsystem.dll").to_string();
+    let matchmaking: String = obfstr!("matchmaking.dll").to_string();
+    let soundsystem: String = obfstr!("soundsystem.dll").to_string();
+    let client = client.as_str();
+    let engine2 = engine2.as_str();
+    let inputsystem = inputsystem.as_str();
+    let matchmaking = matchmaking.as_str();
+    let soundsystem = soundsystem.as_str();
+
     let dw_csgo_input = find_offset_rip32(
-        "client.dll",
+        client,
         sig!(0x48 0x89 0x05 ? ? ? ? 0x0F 0x57 0xC0 0x0F 0x11 0x05),
         3,
     );
     let dw_view_angles = dw_csgo_input.and_then(|csgo_input| {
-        find_pattern_u32("client.dll", sig!(0xF2 0x42 0x0F 0x10 0x84 0x28 ? ? ? ?), 6)
+        find_pattern_u32(client, sig!(0xF2 0x42 0x0F 0x10 0x84 0x28 ? ? ? ?), 6)
             .map(|i| csgo_input.wrapping_add(i as usize))
     });
     let dw_entity_list = find_offset_rip32(
-        "client.dll",
+        client,
         sig!(0x48 0x89 0x0D ? ? ? ? 0xE9 ? ? ? ? 0xCC),
         3,
     );
     let dw_game_entity_system = find_offset_rip32(
-        "client.dll",
+        client,
         sig!(0x48 0x8B 0x1D ? ? ? ? 0x48 0x89 0x1D ? ? ? ? 0x4C 0x63 0xB3),
         3,
     );
     let dw_game_entity_system_highest_entity_index =
-        find_pattern_u32("client.dll", sig!(0xFF 0x81 ? ? ? ? 0x48 0x85 0xD2), 2)
+        find_pattern_u32(client, sig!(0xFF 0x81 ? ? ? ? 0x48 0x85 0xD2), 2)
             .map(|v| v as usize);
     let dw_game_rules = find_offset_rip32(
-        "client.dll",
+        client,
         sig!(0xF6 0xC1 0x01 0x0F 0x85 ? ? ? ? 0x4C 0x8B 0x05 ? ? ? ? 0x4D 0x85),
         12,
     );
     let dw_global_vars =
-        find_offset_rip32("client.dll", sig!(0x48 0x89 0x15 ? ? ? ? 0x48 0x89 0x42), 3);
+        find_offset_rip32(client, sig!(0x48 0x89 0x15 ? ? ? ? 0x48 0x89 0x42), 3);
 
     let dw_glow_manager = find_offset_rip32(
-        "client.dll",
+        client,
         sig!(0x48 0x8B 0x05 ? ? ? ? 0xC3 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0x8B 0x41),
         3,
     );
     let dw_local_player_controller =
-        find_offset_rip32("client.dll", sig!(0x48 0x8B 0x05 ? ? ? ? 0x41 0x89 0xBE), 3);
+        find_offset_rip32(client, sig!(0x48 0x8B 0x05 ? ? ? ? 0x41 0x89 0xBE), 3);
     let dw_planted_c4 = find_offset_rip32(
-        "client.dll",
+        client,
         sig!(0x48 0x8B 0x15 ? ? ? ? 0x41 0xFF 0xC0 0x48 0x8D 0x4C 0x24),
         3,
     );
     let dw_prediction = find_offset_rip32(
-        "client.dll",
+        client,
         sig!(0x48 0x8D 0x05 ? ? ? ? 0xC3 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0x40 0x53 0x56 0x41 0x54),
         3,
     );
     let dw_local_player_pawn = dw_prediction.and_then(|prediction| {
         find_pattern_u32(
-            "client.dll",
+            client,
             sig!(0x4C 0x39 0xB6 ? ? ? ? 0x74 ? 0x44 0x88 0xBE),
             3,
         )
@@ -169,98 +187,98 @@ pub fn discover_globals() -> RuntimeGlobals {
 
     // "lea rcx, [rip+disp32]; movd xmm1, ebp"
     let dw_sensitivity = find_offset_rip32(
-        "client.dll",
+        client,
         sig!(0x48 0x8D 0x0D ? ? ? ? 0x66 0x0F 0x6E 0xCD),
         3,
     )
     .map(|v| v.wrapping_add(8));
     let dw_sensitivity_sensitivity = find_pattern_u8(
-        "client.dll",
+        client,
         sig!(0x48 0x8D 0x7E ? 0x48 0x0F 0xBA 0xE0 ? 0x72 ? 0x85 0xD2 0x49 0x0F 0x4F 0xFF),
         3,
     )
     .map(|v| v as usize);
 
     let dw_view_matrix = find_offset_rip32(
-        "client.dll",
+        client,
         sig!(0x48 0x8D 0x0D ? ? ? ? 0x48 0xC1 0xE0 0x06),
         3,
     );
     let dw_view_render = find_offset_rip32(
-        "client.dll",
+        client,
         sig!(0x48 0x89 0x05 ? ? ? ? 0x48 0x8B 0xC8 0x48 0x85 0xC0),
         3,
     );
     let dw_weapon_c4 = find_offset_rip32(
-        "client.dll",
+        client,
         sig!(0x48 0x8B 0x15 ? ? ? ? 0x48 0x8B 0x5C 0x24 ? 0xFF 0xC0 0x89 0x05 ? ? ? ? 0x48 0x8B 0xC6 0x48 0x89 0x34 0xEA 0x80 0xBE),
         3,
     );
 
     let dw_build_number = find_offset_rip32(
-        "engine2.dll",
+        engine2,
         sig!(0x89 0x05 ? ? ? ? 0x48 0x8D 0x0D ? ? ? ? 0xFF 0x15 ? ? ? ? 0x48 0x8B 0x0D),
         2,
     );
     let dw_network_game_client =
-        find_offset_rip32("engine2.dll", sig!(0x48 0x89 0x3D ? ? ? ? 0xFF 0x87), 3);
+        find_offset_rip32(engine2, sig!(0x48 0x89 0x3D ? ? ? ? 0xFF 0x87), 3);
     let dw_network_game_client_client_tick_count = find_pattern_u32(
-        "engine2.dll",
+        engine2,
         sig!(0x8B 0x81 ? ? ? ? 0xC3 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0x8B 0x81 ? ? ? ? 0xC3 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0x83 0xB9),
         2,
     )
     .map(|v| v as usize);
     let dw_network_game_client_delta_tick = find_pattern_u32(
-        "engine2.dll",
+        engine2,
         sig!(0x4C 0x8D 0xB7 ? ? ? ? 0x4C 0x89 0x7C 0x24),
         3,
     )
     .map(|v| v as usize);
     // `is_background_map` is referenced as "movzx eax, byte ptr [rcx+disp32]"
     let dw_network_game_client_is_background_map = find_pattern_u32(
-        "engine2.dll",
+        engine2,
         sig!(0x0F 0xB6 0x81 ? ? ? ? 0xC3 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0x0F 0xB6 0x81 ? ? ? ? 0xC3 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0x40 0x53),
         3,
     )
     .map(|v| v as usize);
     let dw_network_game_client_local_player = find_pattern_u32(
-        "engine2.dll",
+        engine2,
         sig!(0x42 0x8B 0x94 0xD3 ? ? ? ? 0x5B 0x49 0xFF 0xE3 0x32 0xC0 0x5B 0xC3 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0x40 0x53),
         4,
     )
     .map(|v| v as usize);
     let dw_network_game_client_max_clients = find_pattern_u32(
-        "engine2.dll",
+        engine2,
         sig!(0x8B 0x81 ? ? ? ? 0xC3 ? ? ? ? ? ? ? ? ? 0x8B 0x81 ? ? ? ? 0xC3 ? ? ? ? ? ? ? ? ? 0x8B 0x81),
         2,
     )
     .map(|v| v as usize);
     let dw_network_game_client_server_tick_count = find_pattern_u32(
-        "engine2.dll",
+        engine2,
         sig!(0x8B 0x81 ? ? ? ? 0xC3 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0x83 0xB9),
         2,
     )
     .map(|v| v as usize);
     let dw_network_game_client_sign_on_state = find_pattern_u32(
-        "engine2.dll",
+        engine2,
         sig!(0x44 0x8B 0x81 ? ? ? ? 0x48 0x8D 0x0D),
         3,
     )
     .map(|v| v as usize);
-    let dw_window_height = find_offset_rip32("engine2.dll", sig!(0x8B 0x05 ? ? ? ? 0x89 0x03), 2);
-    let dw_window_width = find_offset_rip32("engine2.dll", sig!(0x8B 0x05 ? ? ? ? 0x89 0x07), 2);
+    let dw_window_height = find_offset_rip32(engine2, sig!(0x8B 0x05 ? ? ? ? 0x89 0x03), 2);
+    let dw_window_width = find_offset_rip32(engine2, sig!(0x8B 0x05 ? ? ? ? 0x89 0x07), 2);
 
     let dw_input_system =
-        find_offset_rip32("inputsystem.dll", sig!(0x48 0x89 0x05 ? ? ? ? 0x33 0xC0), 3);
+        find_offset_rip32(inputsystem, sig!(0x48 0x89 0x05 ? ? ? ? 0x33 0xC0), 3);
     let dw_game_types =
-        find_offset_rip32("matchmaking.dll", sig!(0x48 0x8D 0x0D ? ? ? ? 0xFF 0x90), 3);
+        find_offset_rip32(matchmaking, sig!(0x48 0x8D 0x0D ? ? ? ? 0xFF 0x90), 3);
     let dw_sound_system = find_offset_rip32(
-        "soundsystem.dll",
+        soundsystem,
         sig!(0x48 0x8D 0x05 ? ? ? ? 0xC3 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0xCC 0x48 0x89 0x15),
         3,
     );
     let dw_sound_system_engine_view_data = find_pattern_u8(
-        "soundsystem.dll",
+        soundsystem,
         sig!(0x0F 0x11 0x47 ? 0x0F 0x10 0x4E ? 0x0F 0x11 0x8F),
         3,
     )
