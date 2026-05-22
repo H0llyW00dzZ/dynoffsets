@@ -1718,6 +1718,262 @@ fn walker_free_chain_advances_through_multiple_blobs() {
     );
 }
 
+struct InheritanceLayout {
+    binding_parent: usize,
+    base_info: usize,
+    parent_lite: usize,
+    base_class_name_str: usize,
+}
+
+fn populate_inheritance_layout(
+    region: usize,
+    child_name: &str,
+    parent_name: &str,
+    child_fields: u16,
+) -> InheritanceLayout {
+    let ss_base = region;
+    let scope_array = region + 0x10_0000;
+    let type_scope = region + 0x20_0000;
+    let class_bindings = type_scope + 0x560;
+    let node_child = region + 0x30_0000;
+    let node_parent = region + 0x31_0000;
+    let binding_child = region + 0x40_0000;
+    let binding_parent = region + 0x41_0000;
+    let child_name_str = region + 0x50_0000;
+    let parent_name_str = region + 0x51_0000;
+    let base_info = region + 0x60_0000;
+    let parent_lite = region + 0x61_0000;
+    let base_class_name_str = region + 0x62_0000;
+
+    populate(|s| {
+        s.write_u32(ss_base + 0x190, 1);
+        s.write_usize(ss_base + 0x190 + 8, scope_array);
+        s.write_usize(scope_array, type_scope);
+        s.write_cstr(type_scope + 0x08, "client.dll");
+
+        s.write_u32(class_bindings + 0x0C, 2);
+        s.write_u32(class_bindings + 0x10, 0);
+        s.write_usize(class_bindings + 0x20, 0);
+
+        // Bucket 0 head -> child_node -> parent_node -> 0.
+        s.write_usize(class_bindings + 0x60 + 0x10, node_child);
+        s.write_usize(node_child + 0x08, node_parent);
+        s.write_usize(node_child + 0x10, binding_child);
+        s.write_usize(node_parent + 0x08, 0);
+        s.write_usize(node_parent + 0x10, binding_parent);
+
+        // Child binding: requested direct field count + base_classes chain.
+        s.write_usize(binding_child + 0x08, child_name_str);
+        s.write_cstr(child_name_str, child_name);
+        s.write_i16(binding_child + 0x24, child_fields as i16);
+        s.write_usize(binding_child + 0x30, 0);
+        s.write_usize(binding_child + 0x40, base_info);
+        s.write_usize(base_info + 0x18, parent_lite);
+        s.write_usize(parent_lite + 0x10, base_class_name_str);
+        s.write_cstr(base_class_name_str, parent_name);
+
+        // Parent binding: name only; caller fills in fields.
+        s.write_usize(binding_parent + 0x08, parent_name_str);
+        s.write_cstr(parent_name_str, parent_name);
+    });
+    walker::_test_set_schema_system(ss_base);
+    InheritanceLayout {
+        binding_parent,
+        base_info,
+        parent_lite,
+        base_class_name_str,
+    }
+}
+
+#[test]
+fn walker_inherits_field_from_parent_class() {
+    // Bug 2 regression: looking up an inherited field on the derived class
+    // name must walk `base_classes -> SchemaBaseClassInfoData.class ->
+    // SchemaBaseClass.name` and resolve the parent's direct field.
+    let _g = setup();
+    let region = 0x18_00_0000usize;
+    let layout = populate_inheritance_layout(region, "Child", "Parent", 0);
+    let parent_fields = region + 0x70_0000;
+    let parent_field_name = region + 0x80_0000;
+    populate(|s| {
+        s.write_i16(layout.binding_parent + 0x24, 1);
+        s.write_usize(layout.binding_parent + 0x30, parent_fields);
+        s.write_usize(parent_fields + 0x00, parent_field_name);
+        s.write_u32(parent_fields + 0x10, 0xAA);
+        s.write_cstr(parent_field_name, "m_inherited");
+    });
+    assert_eq!(
+        walker::lookup_offset("client.dll", "Child", "m_inherited"),
+        Some(0xAA)
+    );
+}
+
+#[test]
+fn walker_direct_field_preferred_over_inherited() {
+    // Both child and parent declare `m_overlap`; the direct field must win.
+    let _g = setup();
+    let region = 0x19_00_0000usize;
+    let layout = populate_inheritance_layout(region, "Child", "Parent", 1);
+    let child_fields = region + 0x90_0000;
+    let child_field_name = region + 0x91_0000;
+    let parent_fields = region + 0x70_0000;
+    let parent_field_name = region + 0x80_0000;
+    populate(|s| {
+        // Child direct field with offset 0xC1.
+        s.write_usize(region + 0x40_0000 + 0x30, child_fields);
+        s.write_usize(child_fields + 0x00, child_field_name);
+        s.write_u32(child_fields + 0x10, 0xC1);
+        s.write_cstr(child_field_name, "m_overlap");
+
+        // Parent direct field with offset 0xBA (must NOT be returned).
+        s.write_i16(layout.binding_parent + 0x24, 1);
+        s.write_usize(layout.binding_parent + 0x30, parent_fields);
+        s.write_usize(parent_fields + 0x00, parent_field_name);
+        s.write_u32(parent_fields + 0x10, 0xBA);
+        s.write_cstr(parent_field_name, "m_overlap");
+    });
+    assert_eq!(
+        walker::lookup_offset("client.dll", "Child", "m_overlap"),
+        Some(0xC1)
+    );
+}
+
+#[test]
+fn walker_no_base_class_returns_none() {
+    // Class with no direct field and a null base_classes pointer must NOT
+    // accidentally return a stale or zero offset.
+    let _g = setup();
+    let ss_base = 0x1A_00_0000usize;
+    let scope_array = 0x1A_10_0000usize;
+    let type_scope = 0x1A_20_0000usize;
+    let class_bindings = type_scope + 0x560;
+    let node = 0x1A_30_0000usize;
+    let binding = 0x1A_40_0000usize;
+    let class_name = 0x1A_50_0000usize;
+
+    populate(|s| {
+        s.write_u32(ss_base + 0x190, 1);
+        s.write_usize(ss_base + 0x190 + 8, scope_array);
+        s.write_usize(scope_array, type_scope);
+        s.write_cstr(type_scope + 0x08, "client.dll");
+        s.write_u32(class_bindings + 0x0C, 1);
+        s.write_u32(class_bindings + 0x10, 0);
+        s.write_usize(class_bindings + 0x20, 0);
+        s.write_usize(class_bindings + 0x60 + 0x10, node);
+        s.write_usize(node + 0x08, 0);
+        s.write_usize(node + 0x10, binding);
+        s.write_usize(binding + 0x08, class_name);
+        s.write_cstr(class_name, "Orphan");
+        s.write_i16(binding + 0x24, 0);
+        s.write_usize(binding + 0x30, 0);
+        s.write_usize(binding + 0x40, 0); // null base_classes
+    });
+    walker::_test_set_schema_system(ss_base);
+    assert!(walker::lookup_offset("client.dll", "Orphan", "m_anything").is_none());
+}
+
+#[test]
+fn walker_cyclic_base_class_terminates() {
+    // Parent name resolves back to the child binding itself — recursion
+    // guard must bail rather than blow the stack.
+    let _g = setup();
+    let region = 0x1B_00_0000usize;
+    let layout = populate_inheritance_layout(region, "Loop", "Loop", 0);
+    // Mark parent as having zero direct fields too; the lookup must miss
+    // and unwind through the depth/identity guard cleanly.
+    populate(|s| {
+        s.write_i16(layout.binding_parent + 0x24, 0);
+        s.write_usize(layout.binding_parent + 0x30, 0);
+    });
+    let _ = (
+        layout.base_info,
+        layout.parent_lite,
+        layout.base_class_name_str,
+    );
+    assert!(walker::lookup_offset("client.dll", "Loop", "m_x").is_none());
+}
+
+#[test]
+fn walker_inherits_through_two_levels() {
+    // Child -> Mid -> Grand, field declared only on Grand.
+    let _g = setup();
+    let ss_base = 0x1C_00_0000usize;
+    let scope_array = 0x1C_10_0000usize;
+    let type_scope = 0x1C_20_0000usize;
+    let class_bindings = type_scope + 0x560;
+    let n1 = 0x1C_30_0000usize;
+    let n2 = 0x1C_31_0000usize;
+    let n3 = 0x1C_32_0000usize;
+    let b_child = 0x1C_40_0000usize;
+    let b_mid = 0x1C_41_0000usize;
+    let b_grand = 0x1C_42_0000usize;
+    let s_child = 0x1C_50_0000usize;
+    let s_mid = 0x1C_51_0000usize;
+    let s_grand = 0x1C_52_0000usize;
+    let bi_child = 0x1C_60_0000usize;
+    let bi_mid = 0x1C_61_0000usize;
+    let pl_child = 0x1C_62_0000usize;
+    let pl_mid = 0x1C_63_0000usize;
+    let pn_mid = 0x1C_64_0000usize;
+    let pn_grand = 0x1C_65_0000usize;
+    let grand_fields = 0x1C_70_0000usize;
+    let grand_field_name = 0x1C_80_0000usize;
+
+    populate(|s| {
+        s.write_u32(ss_base + 0x190, 1);
+        s.write_usize(ss_base + 0x190 + 8, scope_array);
+        s.write_usize(scope_array, type_scope);
+        s.write_cstr(type_scope + 0x08, "client.dll");
+
+        s.write_u32(class_bindings + 0x0C, 3);
+        s.write_u32(class_bindings + 0x10, 0);
+        s.write_usize(class_bindings + 0x20, 0);
+
+        s.write_usize(class_bindings + 0x60 + 0x10, n1);
+        s.write_usize(n1 + 0x08, n2);
+        s.write_usize(n1 + 0x10, b_child);
+        s.write_usize(n2 + 0x08, n3);
+        s.write_usize(n2 + 0x10, b_mid);
+        s.write_usize(n3 + 0x08, 0);
+        s.write_usize(n3 + 0x10, b_grand);
+
+        // Child -> base_classes -> "Mid"
+        s.write_usize(b_child + 0x08, s_child);
+        s.write_cstr(s_child, "Child");
+        s.write_i16(b_child + 0x24, 0);
+        s.write_usize(b_child + 0x30, 0);
+        s.write_usize(b_child + 0x40, bi_child);
+        s.write_usize(bi_child + 0x18, pl_child);
+        s.write_usize(pl_child + 0x10, pn_mid);
+        s.write_cstr(pn_mid, "Mid");
+
+        // Mid -> base_classes -> "Grand"
+        s.write_usize(b_mid + 0x08, s_mid);
+        s.write_cstr(s_mid, "Mid");
+        s.write_i16(b_mid + 0x24, 0);
+        s.write_usize(b_mid + 0x30, 0);
+        s.write_usize(b_mid + 0x40, bi_mid);
+        s.write_usize(bi_mid + 0x18, pl_mid);
+        s.write_usize(pl_mid + 0x10, pn_grand);
+        s.write_cstr(pn_grand, "Grand");
+
+        // Grand has the field m_deep at 0xDE.
+        s.write_usize(b_grand + 0x08, s_grand);
+        s.write_cstr(s_grand, "Grand");
+        s.write_i16(b_grand + 0x24, 1);
+        s.write_usize(b_grand + 0x30, grand_fields);
+        s.write_usize(b_grand + 0x40, 0);
+        s.write_usize(grand_fields + 0x00, grand_field_name);
+        s.write_u32(grand_fields + 0x10, 0xDE);
+        s.write_cstr(grand_field_name, "m_deep");
+    });
+    walker::_test_set_schema_system(ss_base);
+    assert_eq!(
+        walker::lookup_offset("client.dll", "Child", "m_deep"),
+        Some(0xDE)
+    );
+}
+
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::r#static::{self as static_mod, populate as static_populate};
