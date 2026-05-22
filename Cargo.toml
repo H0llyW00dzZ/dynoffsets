@@ -2,7 +2,7 @@
 name = "dynoffsets"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.85"
+rust-version = "1.70"
 authors = ["H0llyW00dzZ"]
 description = "Resolve engine struct offsets, module-global pointers, registered interfaces and button-state addresses from a running target process at call time, with compile-time fallback literals. Attribute macros generate the accessors."
 license = "MIT"
@@ -43,7 +43,7 @@ dynoffsets-macros = { version = "0.1.0", path = "macros" }
 spin = { version = "0.12", default-features = false, features = ["mutex", "spin_mutex", "once"] }
 
 pe-sigscan = { version = "0.3", optional = true, default-features = false }
-hashbrown = { version = "0.17", optional = true, default-features = false, features = ["inline-more", "default-hasher"] }
+hashbrown = { version = "0.16", optional = true, default-features = false, features = ["inline-more", "default-hasher"] }
 obfstr = { version = "0.4", optional = true, default-features = false }
 
 [package.metadata.docs.rs]
