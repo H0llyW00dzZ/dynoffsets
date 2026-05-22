@@ -1,0 +1,23 @@
+[package]
+name = "dynoffsets-macros"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["H0llyW00dzZ"]
+description = "Internal proc-macro implementation for dynoffsets. Do not depend on this crate directly — use dynoffsets, which re-exports the macros."
+license = "MIT"
+repository = "https://github.com/H0llyW00dzZ/dynoffsets"
+homepage = "https://github.com/H0llyW00dzZ/dynoffsets"
+documentation = "https://docs.rs/dynoffsets"
+keywords = ["offsets", "schema", "proc-macro", "reverse-engineering", "cs2"]
+categories = ["development-tools::procedural-macro-helpers", "games"]
+include = ["src/**/*.rs", "Cargo.toml"]
+
+[lib]
+proc-macro = true
+path = "src/lib.rs"
+
+[dependencies]
+proc-macro2 = "1.0.69"
+quote = "1.0.33"
+syn = { version = "2.0.38", features = ["full"] }
