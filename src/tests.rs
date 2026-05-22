@@ -839,7 +839,6 @@ fn discover_globals_resolves_all_remaining_struct_offset_fields() {
             Some(0xCC),
             Some(0xCC),
             Some(0xCC),
-            Some(0xCC),
             Some(0x40),
             Some(0x53),
         ],
