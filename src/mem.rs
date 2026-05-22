@@ -37,3 +37,11 @@ pub fn read_ptr(base: usize, off: usize) -> Option<usize> {
 pub fn read_cstring(addr: usize, max_len: usize) -> Option<String> {
     process()?.read_cstring(addr, max_len)
 }
+
+#[inline]
+pub fn read_cstring_hash(addr: usize, max_len: usize) -> Option<u32> {
+    let mut buf = alloc::vec![0u8; max_len];
+    process()?.read_bytes(addr, &mut buf)?;
+    let end = buf.iter().position(|&b| b == 0).unwrap_or(max_len);
+    Some(crate::fnv1a_bytes(&buf[..end]))
+}
