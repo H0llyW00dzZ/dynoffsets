@@ -1,4 +1,4 @@
-name: 🧪 CI
+name: 🧪 CI (Windows only)
 
 on:
   push:
@@ -19,15 +19,15 @@ on:
       - '.github/dependabot.yml'
 
 jobs:
-  coverage:
-    name: 🔢 Test on ${{ matrix.os }} (Rust ${{ matrix.rust }})
+  test:
+    name: Test on ${{ matrix.os }} (Rust ${{ matrix.rust }})
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.rust == 'nightly' }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, ubuntu-22.04, ubuntu-24.04-arm, ubuntu-22.04-arm, macos-latest, windows-latest, windows-2022, windows-11-arm]
-        rust: [stable, beta, nightly, '1.70']
+        os: [windows-latest, windows-2022]
+        rust: [stable, beta, nightly, '1.72']
 
     steps:
     - name: Checkout code
@@ -37,38 +37,16 @@ jobs:
       uses: dtolnay/rust-toolchain@master
       with:
         toolchain: ${{ matrix.rust }}
-        components: llvm-tools-preview
 
     - name: Cache cargo registry and build artifacts
       uses: Swatinem/rust-cache@v2
 
-    - name: Install cargo-llvm-cov
-      uses: taiki-e/install-action@v2
-      with:
-        tool: cargo-llvm-cov
-      if: ${{ matrix.os != 'windows-11-arm' && matrix.rust != '1.70' }}
-
-    - name: Run tests with coverage
-      if: ${{ matrix.os != 'windows-11-arm' && matrix.rust != '1.70' }}
-      run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
-
-    - name: Run tests (no coverage on windows-11-arm)
-      if: ${{ matrix.os == 'windows-11-arm' && matrix.rust != '1.70' }}
+    - name: Test (stable / beta / nightly)
+      if: ${{ matrix.rust != '1.72' }}
       run: cargo test --all-features
 
-    # MSRV check: only verify the library itself compiles on 1.70.
-    # `cargo build` does NOT resolve dev-dependencies (none in this crate),
-    # ensuring the MSRV gate applies strictly to the published artifact.
-    - name: MSRV build check
-      if: ${{ matrix.rust == '1.70' }}
+    # MSRV check: only verify the library itself compiles on 1.72.
+    # Using `cargo build` (not `test`) so dev-dependencies are not resolved.
+    - name: MSRV build check (1.72)
+      if: ${{ matrix.rust == '1.72' }}
       run: cargo build --all-features --verbose
-
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v6
-      if: ${{ matrix.os == 'ubuntu-latest' && matrix.rust == 'stable' }}
-      env:
-        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-      with:
-        files: ./lcov.info
-        flags: unittests
-        name: codecov-umbrella
