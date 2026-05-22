@@ -90,9 +90,12 @@ fn schema_system() -> Option<usize> {
         let p = SCHEMA_SYSTEM.load(Ordering::Acquire);
         return (p != 0).then_some(p);
     }
-    let v =
-        sigscan::find_pattern_rip32("schemasystem.dll", SCHEMA_SYSTEM_PATTERN, SCHEMA_SYSTEM_DISP)
-            .unwrap_or(0);
+    let v = sigscan::find_pattern_rip32(
+        "schemasystem.dll",
+        SCHEMA_SYSTEM_PATTERN,
+        SCHEMA_SYSTEM_DISP,
+    )
+    .unwrap_or(0);
     SCHEMA_SYSTEM.store(v, Ordering::Release);
     RESOLVED.store(true, Ordering::Release);
     (v != 0).then_some(v)
@@ -113,7 +116,10 @@ pub fn lookup_offset(module: &str, class: &str, field: &str) -> Option<u32> {
         }
     }
     let off = lookup_uncached(module, class, field)?;
-    cache().lock().insert((module.to_string(), class.to_string(), field.to_string()), off);
+    cache().lock().insert(
+        (module.to_string(), class.to_string(), field.to_string()),
+        off,
+    );
     Some(off)
 }
 

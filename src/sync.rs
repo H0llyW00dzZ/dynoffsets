@@ -9,7 +9,9 @@ pub struct OnceCell<T> {
 
 impl<T> OnceCell<T> {
     pub const fn new() -> Self {
-        Self { inner: spin::Once::new() }
+        Self {
+            inner: spin::Once::new(),
+        }
     }
 
     #[inline]

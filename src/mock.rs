@@ -42,7 +42,10 @@ impl MockState {
     }
 
     pub fn add_export(&mut self, module: &str, name: &str, addr: usize) {
-        self.exports.entry(module.to_string()).or_default().insert(name.to_string(), addr);
+        self.exports
+            .entry(module.to_string())
+            .or_default()
+            .insert(name.to_string(), addr);
     }
 
     pub fn write_bytes(&mut self, addr: usize, data: &[u8]) {
@@ -103,7 +106,13 @@ impl Process for MockHandle {
     }
 
     fn get_proc_address(&self, m: &str, n: &str) -> Option<usize> {
-        mock_state().lock().unwrap().exports.get(m).and_then(|x| x.get(n)).copied()
+        mock_state()
+            .lock()
+            .unwrap()
+            .exports
+            .get(m)
+            .and_then(|x| x.get(n))
+            .copied()
     }
 }
 
@@ -125,6 +134,7 @@ pub fn setup() -> MutexGuard<'static, ()> {
     mock_state().lock().unwrap().reset();
     crate::sigscan::clear_pattern_overrides();
     crate::walker::_test_reset_schema_system();
+    crate::r#static::_test_clear();
     g
 }
 
