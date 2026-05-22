@@ -9,6 +9,7 @@ use alloc::vec;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use hashbrown::HashMap;
+use obfstr::obfstr;
 
 use crate::mem;
 use crate::sigscan;
@@ -102,7 +103,7 @@ fn schema_system() -> Option<usize> {
         return (p != 0).then_some(p);
     }
     let v = sigscan::find_pattern_rip32(
-        "schemasystem.dll",
+        obfstr!("schemasystem.dll"),
         SCHEMA_SYSTEM_PATTERN,
         SCHEMA_SYSTEM_DISP,
     )

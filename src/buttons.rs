@@ -6,6 +6,7 @@
 use alloc::string::{String, ToString};
 
 use hashbrown::HashMap;
+use obfstr::obfstr;
 
 use crate::mem;
 use crate::sigscan::find_pattern_rip32;
@@ -60,7 +61,7 @@ const MAX_NAME: usize = 32;
 pub fn discover_buttons() -> RuntimeButtons {
     let mut out = RuntimeButtons::default();
 
-    let cell = match find_pattern_rip32("client.dll", BTN_PATTERN, BTN_DISP) {
+    let cell = match find_pattern_rip32(obfstr!("client.dll"), BTN_PATTERN, BTN_DISP) {
         Some(a) => a,
         None => return out,
     };
