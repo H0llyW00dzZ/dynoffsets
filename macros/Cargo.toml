@@ -2,7 +2,7 @@
 name = "dynoffsets-macros"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.70"
+rust-version = "1.71"
 authors = ["H0llyW00dzZ"]
 description = "Internal proc-macro implementation for dynoffsets. Do not depend on this crate directly — use dynoffsets, which re-exports the macros."
 license = "MIT"
