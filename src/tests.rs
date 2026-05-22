@@ -522,6 +522,7 @@ fn discover_globals_resolves_one_known_pattern() {
         Some(0x33),
         Some(0xC0),
     ];
+    populate(|s| s.add_module("inputsystem.dll", 0));
     sigscan::set_pattern_rip32("inputsystem.dll", pat, 3, Some(0xFEED_FACE_usize));
     let r = offsets::discover_globals();
     assert_eq!(r.dw_input_system, Some(0xFEED_FACE_usize));
@@ -557,6 +558,7 @@ fn discover_globals_resolves_view_angles_as_csgo_input_plus_imm() {
         None,
         None,
     ];
+    populate(|s| s.add_module("client.dll", 0));
     sigscan::set_pattern_rip32("client.dll", csgo_pat, 3, Some(0x1000));
     sigscan::set_pattern_u32("client.dll", secondary, 6, Some(0x40));
     let r = offsets::discover_globals();
@@ -646,6 +648,7 @@ fn discover_globals_resolves_local_player_pawn_as_prediction_plus_imm() {
         Some(0x88),
         Some(0xBE),
     ];
+    populate(|s| s.add_module("client.dll", 0));
     sigscan::set_pattern_rip32("client.dll", pred_pat, 3, Some(0x2000));
     sigscan::set_pattern_u32("client.dll", secondary, 3, Some(0x80));
     let r = offsets::discover_globals();
@@ -836,6 +839,7 @@ fn discover_globals_resolves_all_remaining_struct_offset_fields() {
             Some(0xCC),
             Some(0xCC),
             Some(0xCC),
+            Some(0xCC),
             Some(0x40),
             Some(0x53),
         ],
@@ -927,7 +931,6 @@ fn discover_globals_resolves_all_remaining_struct_offset_fields() {
             None,
             None,
             Some(0xC3),
-            Some(0xCC),
             Some(0xCC),
             Some(0xCC),
             Some(0xCC),
@@ -1770,6 +1773,7 @@ fn slots_populate_writes_live_globals_into_atomic_slot() {
         Some(0x33),
         Some(0xC0),
     ];
+    populate(|s| s.add_module("inputsystem.dll", 0));
     sigscan::set_pattern_rip32("inputsystem.dll", pat, 3, Some(0xFEED_FACE_usize));
 
     static SLOT: AtomicUsize = AtomicUsize::new(0xDEAD);
@@ -1893,6 +1897,7 @@ fn slots_populate_is_idempotent() {
         Some(0x33),
         Some(0xC0),
     ];
+    populate(|s| s.add_module("inputsystem.dll", 0));
     sigscan::set_pattern_rip32("inputsystem.dll", pat, 3, Some(0xFEED_FACE_usize));
 
     static SLOT: AtomicUsize = AtomicUsize::new(0);
