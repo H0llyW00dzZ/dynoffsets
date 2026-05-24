@@ -1,5 +1,10 @@
 use crate::process;
 
+#[inline]
+fn read_unaligned<T: Copy>(addr: usize) -> T {
+    unsafe { core::ptr::read_unaligned(addr as *const T) }
+}
+
 /// Byte pattern search inside module .text.
 pub fn find_pattern(module: &str, pattern: &[Option<u8>]) -> Option<usize> {
     #[cfg(test)]
@@ -38,7 +43,7 @@ pub fn find_pattern_u32(module: &str, pattern: &[Option<u8>], imm_off: usize) ->
     }
     let match_addr = find_pattern(module, pattern)?;
     let imm_addr = match_addr.checked_add(imm_off)?;
-    Some(unsafe { core::ptr::read_unaligned(imm_addr as *const u32) })
+    Some(read_unaligned::<u32>(imm_addr))
 }
 
 /// u8-immediate variant of find_pattern_u32.
@@ -52,7 +57,7 @@ pub fn find_pattern_u8(module: &str, pattern: &[Option<u8>], imm_off: usize) -> 
     }
     let match_addr = find_pattern(module, pattern)?;
     let imm_addr = match_addr.checked_add(imm_off)?;
-    Some(unsafe { core::ptr::read_unaligned(imm_addr as *const u8) })
+    Some(read_unaligned::<u8>(imm_addr))
 }
 
 /// Resolve rel32 immediate at inst_addr + disp_off (full instr len = instr_len).
