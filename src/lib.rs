@@ -235,8 +235,10 @@ impl RuntimeButtons {
 
 /// Memory access trait for the runtime dumper.
 ///
-/// Implementors provide raw reads and module lookups. Override the typed
-/// `read_*` methods for zero-copy if your backend already has them.
+/// Implementors provide raw reads and module lookups for every runtime path,
+/// including pattern scanning through `pe-sigscan`'s reader-backed APIs.
+/// Override the typed `read_*` methods for zero-copy if your backend already
+/// has them.
 pub trait Process: Send + Sync + 'static {
     fn read_bytes(&self, addr: usize, buf: &mut [u8]) -> Option<()>;
     fn module_base(&self, module: &str) -> Option<usize>;

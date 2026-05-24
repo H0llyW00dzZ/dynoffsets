@@ -31,25 +31,29 @@ fn rel32_instr(offset: i32) -> (usize, usize) {
     (inst_addr, target)
 }
 
-/// Leak a heap buffer with a u32 little-endian at `imm_off`; return the buffer
-/// base address. Used to exercise `find_pattern_u32`'s real-path unaligned read.
-fn imm32_at(imm_off: usize, val: u32) -> usize {
-    let mut v: alloc::vec::Vec<u8> = alloc::vec![0u8; imm_off + 4];
-    v[imm_off..imm_off + 4].copy_from_slice(&val.to_le_bytes());
-    let b = v.into_boxed_slice();
-    let addr = b.as_ptr() as usize;
-    let _ = alloc::boxed::Box::leak(b);
-    addr
+fn mock_rel32_instr(inst_addr: usize, offset: i32) -> usize {
+    let next_ip = inst_addr + 7;
+    let target = (next_ip as isize).wrapping_add(offset as isize) as usize;
+    populate(|s| s.write_bytes(inst_addr + 3, &offset.to_le_bytes()));
+    target
 }
 
-/// Same shape as [`imm32_at`] but for a single byte.
-fn imm8_at(imm_off: usize, val: u8) -> usize {
-    let mut v: alloc::vec::Vec<u8> = alloc::vec![0u8; imm_off + 1];
-    v[imm_off] = val;
-    let b = v.into_boxed_slice();
-    let addr = b.as_ptr() as usize;
-    let _ = alloc::boxed::Box::leak(b);
-    addr
+fn add_text_module(module: &str, base: usize, text: &[u8]) {
+    populate(|s| {
+        let nt = base + 0x80;
+        let section = nt + 4 + 20 + 0xF0;
+        s.add_module(module, base);
+        s.write_bytes(base, b"MZ");
+        s.write_u32(base + 0x3C, 0x80);
+        s.write_bytes(nt, b"PE\0\0");
+        s.write_bytes(nt + 4 + 2, &(1u16).to_le_bytes());
+        s.write_bytes(nt + 4 + 16, &(0xF0u16).to_le_bytes());
+        s.write_bytes(section, b".text\0\0\0");
+        s.write_u32(section + 8, text.len() as u32);
+        s.write_u32(section + 12, 0x300);
+        s.write_u32(section + 36, 0x2000_0000);
+        s.write_bytes(base + 0x300, text);
+    });
 }
 
 #[test]
@@ -336,7 +340,9 @@ fn sigscan_resolve_rel32_at_disp_off_overflow() {
 
 #[test]
 fn sigscan_resolve_rel32_at_happy_path() {
-    let (inst, target) = rel32_instr(100);
+    let _g = setup();
+    let inst = 0x1200_0000usize;
+    let target = mock_rel32_instr(inst, 100);
     assert_eq!(sigscan::resolve_rel32_at(inst, 3, 7), Some(target));
 }
 
@@ -347,7 +353,9 @@ fn sigscan_resolve_rip32_at_overflow_in_instr_len() {
 
 #[test]
 fn sigscan_resolve_rip32_at_happy_path() {
-    let (inst, target) = rel32_instr(-200);
+    let _g = setup();
+    let inst = 0x1200_1000usize;
+    let target = mock_rel32_instr(inst, -200);
     assert_eq!(sigscan::resolve_rip32_at(inst, 3), Some(target));
 }
 
@@ -374,6 +382,16 @@ fn sigscan_find_pattern_no_override_no_module() {
 }
 
 #[test]
+fn sigscan_find_pattern_scans_module_through_process_backend() {
+    let _g = setup();
+    let base = 0x1000_0000usize;
+    add_text_module("client.dll", base, &[0xAA, 0x48, 0x8B, 0x05, 0xFF]);
+    let pat = &[Some(0x48u8), Some(0x8B), Some(0x05)][..];
+
+    assert_eq!(sigscan::find_pattern("client.dll", pat), Some(base + 0x301));
+}
+
+#[test]
 fn sigscan_find_pattern_rip32_via_rip32_override() {
     let _g = setup();
     let pat = &[Some(0xAAu8)][..];
@@ -384,10 +402,27 @@ fn sigscan_find_pattern_rip32_via_rip32_override() {
 #[test]
 fn sigscan_find_pattern_rip32_via_raw_override_then_resolve() {
     let _g = setup();
-    let (inst, target) = rel32_instr(64);
+    let inst = 0x1300_0000usize;
+    let target = mock_rel32_instr(inst, 64);
     let pat = &[Some(0xBBu8)][..];
     sigscan::set_pattern("m2.dll", pat, Some(inst));
     assert_eq!(sigscan::find_pattern_rip32("m2.dll", pat, 3), Some(target));
+}
+
+#[test]
+fn sigscan_find_pattern_rip32_reads_through_process_backend() {
+    let _g = setup();
+    let base = 0x1100_0000usize;
+    let next_ip = base + 0x300 + 7;
+    let target = base + 0x500;
+    let disp = (target as isize).wrapping_sub(next_ip as isize) as i32;
+    let mut body = [0u8; 7];
+    body[..3].copy_from_slice(&[0x48, 0x8B, 0x05]);
+    body[3..7].copy_from_slice(&disp.to_le_bytes());
+    add_text_module("rip.dll", base, &body);
+    let pat = &[Some(0x48u8), Some(0x8B), Some(0x05), None, None, None, None][..];
+
+    assert_eq!(sigscan::find_pattern_rip32("rip.dll", pat, 3), Some(target));
 }
 
 #[test]
@@ -416,7 +451,8 @@ fn sigscan_find_pattern_u32_via_override_some_and_none() {
 #[test]
 fn sigscan_find_pattern_u32_reads_unaligned_from_match_site() {
     let _g = setup();
-    let addr = imm32_at(3, 0xCAFE_BABE);
+    let addr = 0x2000usize;
+    populate(|s| s.write_u32(addr + 3, 0xCAFE_BABE));
     let pat = &[Some(0xEEu8)][..];
     sigscan::set_pattern("m.dll", pat, Some(addr));
     assert_eq!(
@@ -448,7 +484,8 @@ fn sigscan_find_pattern_u8_via_override_some_and_none() {
 #[test]
 fn sigscan_find_pattern_u8_reads_byte_from_match_site() {
     let _g = setup();
-    let addr = imm8_at(2, 0xAB);
+    let addr = 0x3000usize;
+    populate(|s| s.write_bytes(addr + 2, &[0xAB]));
     let pat = &[Some(0xC2u8)][..];
     sigscan::set_pattern("m.dll", pat, Some(addr));
     assert_eq!(sigscan::find_pattern_u8("m.dll", pat, 2), Some(0xAB));
@@ -1128,7 +1165,8 @@ fn discover_interfaces_in_skips_modules_without_create_interface() {
 #[test]
 fn discover_interfaces_in_skips_module_with_zero_head() {
     let _g = setup();
-    let (inst, cell) = rel32_instr(0x100);
+    let inst = 0x1400_0000usize;
+    let cell = mock_rel32_instr(inst, 0x100);
     populate(|s| {
         s.add_export("client.dll", "CreateInterface", inst);
         s.write_usize(cell, 0);
@@ -1140,9 +1178,12 @@ fn discover_interfaces_in_skips_module_with_zero_head() {
 #[test]
 fn discover_interfaces_in_walks_chain_with_two_entries() {
     let _g = setup();
-    let (ci_inst, cell) = rel32_instr(0x200);
-    let (create1_inst, inst1) = rel32_instr(0x400);
-    let (create2_inst, inst2) = rel32_instr(0x800);
+    let ci_inst = 0x1410_0000usize;
+    let cell = mock_rel32_instr(ci_inst, 0x200);
+    let create1_inst = 0x1410_1000usize;
+    let inst1 = mock_rel32_instr(create1_inst, 0x400);
+    let create2_inst = 0x1410_2000usize;
+    let inst2 = mock_rel32_instr(create2_inst, 0x800);
 
     let reg1 = 0x81_0000usize;
     let reg2 = 0x82_0000usize;
@@ -1172,8 +1213,10 @@ fn discover_interfaces_in_walks_chain_with_two_entries() {
 #[test]
 fn discover_interfaces_in_skips_entries_with_zero_create_or_name() {
     let _g = setup();
-    let (ci_inst, cell) = rel32_instr(0x200);
-    let (create2_inst, inst2) = rel32_instr(0x800);
+    let ci_inst = 0x1420_0000usize;
+    let cell = mock_rel32_instr(ci_inst, 0x200);
+    let create2_inst = 0x1420_1000usize;
+    let inst2 = mock_rel32_instr(create2_inst, 0x800);
 
     let reg1 = 0xA1_0000usize;
     let reg2 = 0xA2_0000usize;
@@ -1198,7 +1241,8 @@ fn discover_interfaces_in_skips_entries_with_zero_create_or_name() {
 #[test]
 fn discover_interfaces_in_stops_when_node_unreadable() {
     let _g = setup();
-    let (ci_inst, cell) = rel32_instr(0x200);
+    let ci_inst = 0x1430_0000usize;
+    let cell = mock_rel32_instr(ci_inst, 0x200);
     let bad_node = 0xCC_CC00usize;
     populate(|s| {
         s.add_export("bar.dll", "CreateInterface", ci_inst);
@@ -2120,8 +2164,10 @@ fn slots_populate_leaves_literal_when_schema_lookup_misses() {
 #[test]
 fn slots_populate_writes_live_interfaces_into_atomic_slot() {
     let _g = setup();
-    let (ci_inst, cell) = rel32_instr(0x200);
-    let (create_inst, inst) = rel32_instr(0x400);
+    let ci_inst = 0x1440_0000usize;
+    let cell = mock_rel32_instr(ci_inst, 0x200);
+    let create_inst = 0x1440_1000usize;
+    let inst = mock_rel32_instr(create_inst, 0x400);
     let reg = 0xB1_0000usize;
     let name_addr = 0xB2_0000usize;
 
@@ -2274,8 +2320,10 @@ fn populate_stats_default_is_all_zero() {
 #[test]
 fn discover_interfaces_in_skips_entry_with_unreadable_name() {
     let _g = setup();
-    let (ci_inst, cell) = rel32_instr(0x200);
-    let (create_inst, _) = rel32_instr(0x400);
+    let ci_inst = 0x1450_0000usize;
+    let cell = mock_rel32_instr(ci_inst, 0x200);
+    let create_inst = 0x1450_1000usize;
+    let _ = mock_rel32_instr(create_inst, 0x400);
     let reg = 0xB1_0000usize;
     let bad_name = 0xB2_0000usize;
 

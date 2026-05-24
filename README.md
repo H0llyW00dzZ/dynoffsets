@@ -90,6 +90,10 @@ Supported backends include (but are not limited to):
 - DMA / PCIe cards, FPGA, Thunderbolt DMA
 - hypervisor / VM introspection
 
+Pattern scanning for runtime globals and related discovery now goes through
+reader-backed `pe-sigscan` APIs, so custom backends are supported for scanning
+too, not just primitive reads.
+
 See docs.rs for the four attribute macros and the `Process` trait.
 
 ## Using With MinHook

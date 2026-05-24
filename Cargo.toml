@@ -42,7 +42,7 @@ dynoffsets-macros = { version = "0.1.0", path = "macros" }
 # ~5 KB, zero transitive deps.
 spin = { version = "0.12", default-features = false, features = ["mutex", "spin_mutex", "once"] }
 
-pe-sigscan = { version = "0.3", optional = true, default-features = false }
+pe-sigscan = { version = "0.4", optional = true, default-features = false }
 hashbrown = { version = "0.16", optional = true, default-features = false, features = ["inline-more", "default-hasher"] }
 obfstr = { version = "0.4", optional = true, default-features = false }
 
