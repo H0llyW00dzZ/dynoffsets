@@ -82,6 +82,71 @@ Windows only today. TODO: Linux support.
 
 See docs.rs for the four attribute macros and the `Process` trait.
 
+## Using With MinHook
+
+`dynoffsets` does not ship a detour API or MinHook bindings. Its job is to
+resolve addresses; your hook layer installs the hook.
+
+The most common pattern is:
+
+1. Use `#[interfaces]` to resolve a live interface pointer.
+2. Read the vtable slot for the method you want to hook.
+3. Pass that function entry address to MinHook.
+
+`#[schema]`, `#[globals]`, and `#[buttons]` usually resolve data addresses, not
+hook targets by themselves.
+
+Example sketch using `minhook-sys`:
+
+```rust
+use core::{ffi::c_void, mem, ptr};
+
+use dynoffsets::interfaces;
+use minhook_sys::{MH_CreateHook, MH_EnableHook, MH_Initialize, MH_OK};
+
+#[interfaces("engine2.dll")]
+mod engine2 {
+    pub const Source2EngineToClient001: usize = 0;
+}
+
+type TargetFn = unsafe extern "system" fn(this: *mut c_void, arg: i32) -> i32;
+
+static mut ORIGINAL_TARGET: Option<TargetFn> = None;
+
+unsafe extern "system" fn hk_target(this: *mut c_void, arg: i32) -> i32 {
+    let original = ORIGINAL_TARGET.expect("hook not installed");
+    original(this, arg)
+}
+
+unsafe fn vfunc(instance: usize, index: usize) -> *mut c_void {
+    let vtable = *(instance as *const *const usize);
+    *vtable.add(index) as *mut c_void
+}
+
+unsafe fn install_hook() {
+    let iface = engine2::Source2EngineToClient001();
+    assert_ne!(iface, 0, "interface was not resolved");
+
+    // Replace 42 with the real vtable index for the method you want.
+    let target = vfunc(iface, 42);
+
+    assert_eq!(MH_Initialize(), MH_OK);
+
+    let mut original = ptr::null_mut();
+    assert_eq!(
+        MH_CreateHook(target, hk_target as *mut c_void, &mut original),
+        MH_OK,
+    );
+
+    ORIGINAL_TARGET = Some(mem::transmute(original));
+
+    assert_eq!(MH_EnableHook(target), MH_OK);
+}
+```
+
+The same idea works for exported functions too: resolve the function entry with
+your own backend or module logic, then hand that address to MinHook.
+
 ## cs2-dumper vs dynoffsets
 
 [cs2-dumper](https://github.com/a2x/cs2-dumper) is an external analysis tool that emits static offset headers.
