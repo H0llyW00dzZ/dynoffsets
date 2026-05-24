@@ -1,5 +1,7 @@
 # dynoffsets
 [![codecov](https://codecov.io/gh/H0llyW00dzZ/dynoffsets/graph/badge.svg?token=Q1W56W96L7)](https://codecov.io/gh/H0llyW00dzZ/dynoffsets)
+[![Crates.io](https://img.shields.io/crates/v/dynoffsets.svg)](https://crates.io/crates/dynoffsets)
+[![Documentation](https://docs.rs/dynoffsets/badge.svg)](https://docs.rs/dynoffsets)
 
 Resolve offsets, globals, interfaces and buttons at call time with literal fallbacks.
 
