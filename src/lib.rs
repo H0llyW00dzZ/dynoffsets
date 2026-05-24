@@ -233,10 +233,23 @@ impl RuntimeButtons {
     }
 }
 
+#[cfg(feature = "runtime")]
+struct ProcessReader<'a, P: ?Sized>(&'a P);
+
+#[cfg(feature = "runtime")]
+impl<P: Process + ?Sized> pe_sigscan::MemoryReader for ProcessReader<'_, P> {
+    fn read_bytes(&self, addr: usize, buf: &mut [u8]) -> Option<()> {
+        self.0.read_bytes(addr, buf)
+    }
+}
+
 /// Memory access trait for the runtime dumper.
 ///
-/// Implementors provide raw reads and module lookups for every runtime path,
-/// including pattern scanning through `pe-sigscan`'s reader-backed APIs.
+/// Implementors provide raw reads and module lookups for every runtime path.
+/// The default scan helpers use `pe-sigscan`'s reader-backed APIs so custom
+/// backends remain correct. Local in-process backends that can safely
+/// dereference module memory should override [`Process::scan_text`] and, if
+/// desired, [`Process::resolve_rel32_at`] to restore the direct fast path.
 /// Override the typed `read_*` methods for zero-copy if your backend already
 /// has them.
 pub trait Process: Send + Sync + 'static {
@@ -248,6 +261,30 @@ pub trait Process: Send + Sync + 'static {
     }
     fn get_proc_address(&self, _module: &str, _proc_name: &str) -> Option<usize> {
         None
+    }
+
+    #[cfg(feature = "runtime")]
+    fn scan_text(&self, module: &str, pattern: &[Option<u8>]) -> Option<usize> {
+        let base = self.module_base(module)?;
+        pe_sigscan::find_in_text_with(&ProcessReader(self), base, pattern)
+    }
+
+    #[cfg(feature = "runtime")]
+    fn resolve_rel32_at(
+        &self,
+        inst_addr: usize,
+        disp_off: usize,
+        instr_len: usize,
+    ) -> Option<usize> {
+        if disp_off.checked_add(4)? > instr_len {
+            return None;
+        }
+        let rel32_addr = inst_addr.checked_add(disp_off)?;
+        let next_ip = inst_addr.checked_add(instr_len)?;
+        let mut buf = [0u8; 4];
+        self.read_bytes(rel32_addr, &mut buf)?;
+        let disp = i32::from_le_bytes(buf) as isize;
+        Some((next_ip as isize).wrapping_add(disp) as usize)
     }
 
     fn read_usize(&self, addr: usize) -> Option<usize> {

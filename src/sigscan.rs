@@ -1,16 +1,8 @@
-use crate::{process, Process};
+use crate::process;
 
 #[inline]
 fn read_unaligned<T: Copy>(addr: usize) -> T {
     unsafe { core::ptr::read_unaligned(addr as *const T) }
-}
-
-struct ProcessReader<'a>(&'a dyn Process);
-
-impl pe_sigscan::MemoryReader for ProcessReader<'_> {
-    fn read_bytes(&self, addr: usize, buf: &mut [u8]) -> Option<()> {
-        self.0.read_bytes(addr, buf)
-    }
 }
 
 #[inline]
@@ -44,8 +36,7 @@ pub fn find_pattern(module: &str, pattern: &[Option<u8>]) -> Option<usize> {
     }
 
     let p = process()?;
-    let base = p.module_base(module)?;
-    pe_sigscan::find_in_text_with(&ProcessReader(p), base, pattern)
+    p.scan_text(module, pattern)
 }
 
 /// Pattern scan followed by RIP-relative 32-bit displacement resolution.
@@ -90,24 +81,13 @@ pub fn find_pattern_u8(module: &str, pattern: &[Option<u8>], imm_off: usize) -> 
 
 /// Resolve rel32 immediate at inst_addr + disp_off (full instr len = instr_len).
 pub fn resolve_rel32_at(inst_addr: usize, disp_off: usize, instr_len: usize) -> Option<usize> {
+    if let Some(p) = process() {
+        return p.resolve_rel32_at(inst_addr, disp_off, instr_len);
+    }
+
     if disp_off.checked_add(4)? > instr_len {
         return None;
     }
-    if let Some(p) = process() {
-        let rel32_addr = inst_addr.checked_add(disp_off)?;
-        let next_ip = inst_addr.checked_add(instr_len)?;
-        let mut buf = [0u8; 4];
-        if p.read_bytes(rel32_addr, &mut buf).is_some() {
-            let disp = i32::from_le_bytes(buf) as isize;
-            return Some((next_ip as isize).wrapping_add(disp) as usize);
-        }
-
-        #[cfg(not(test))]
-        {
-            return None;
-        }
-    }
-
     Some(unsafe { pe_sigscan::resolve_rel32_at(inst_addr, disp_off, instr_len) })
 }
 
