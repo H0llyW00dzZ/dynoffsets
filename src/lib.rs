@@ -7,6 +7,68 @@
 //! feature (or before `init`), they return the declared literal.
 //!
 //! The crate supports `#![no_std]` + `alloc`.
+//!
+//! # Using With MinHook
+//!
+//! `dynoffsets` does not provide a hook engine. It resolves runtime addresses;
+//! a library such as MinHook installs the detour.
+//!
+//! The usual flow is:
+//!
+//! 1. Resolve a live interface pointer with [`interfaces`].
+//! 2. Read the vtable slot for the method you want to hook.
+//! 3. Pass that function entry address to MinHook.
+//!
+//! [`schema`] and [`globals`] usually resolve data addresses rather than hook
+//! targets, so [`interfaces`] is the most common fit for MinHook-based setups.
+//!
+//! ```rust,ignore
+//! use core::{ffi::c_void, mem, ptr};
+//!
+//! use dynoffsets::interfaces;
+//! use minhook_sys::{MH_CreateHook, MH_EnableHook, MH_Initialize, MH_OK};
+//!
+//! #[interfaces("engine2.dll")]
+//! mod engine2 {
+//!     pub const Source2EngineToClient001: usize = 0;
+//! }
+//!
+//! type TargetFn = unsafe extern "system" fn(this: *mut c_void, arg: i32) -> i32;
+//!
+//! static mut ORIGINAL_TARGET: Option<TargetFn> = None;
+//!
+//! unsafe extern "system" fn hk_target(this: *mut c_void, arg: i32) -> i32 {
+//!     let original = ORIGINAL_TARGET.expect("hook not installed");
+//!     original(this, arg)
+//! }
+//!
+//! unsafe fn vfunc(instance: usize, index: usize) -> *mut c_void {
+//!     let vtable = *(instance as *const *const usize);
+//!     *vtable.add(index) as *mut c_void
+//! }
+//!
+//! unsafe fn install_hook() {
+//!     let iface = engine2::Source2EngineToClient001();
+//!     assert_ne!(iface, 0, "interface was not resolved");
+//!
+//!     let target = vfunc(iface, 42);
+//!
+//!     assert_eq!(MH_Initialize(), MH_OK);
+//!
+//!     let mut original = ptr::null_mut();
+//!     assert_eq!(
+//!         MH_CreateHook(target, hk_target as *mut c_void, &mut original),
+//!         MH_OK,
+//!     );
+//!
+//!     ORIGINAL_TARGET = Some(mem::transmute(original));
+//!
+//!     assert_eq!(MH_EnableHook(target), MH_OK);
+//! }
+//! ```
+//!
+//! The same pattern works for exported functions when your backend can resolve
+//! the function entry address.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![allow(clippy::missing_safety_doc)]
