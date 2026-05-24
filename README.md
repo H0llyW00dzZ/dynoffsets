@@ -159,7 +159,7 @@ your own backend or module logic, then hand that address to MinHook.
 
 ## TODO
 
-- [ ] Linux support. The crate is Windows-only today.
+- [ ] Native Linux support. The crate is Windows-only today.
 
 ## cs2-dumper vs dynoffsets
 
