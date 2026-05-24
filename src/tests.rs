@@ -1153,12 +1153,12 @@ fn discover_interfaces_in_walks_chain_with_two_entries() {
         s.add_export("server.dll", "CreateInterface", ci_inst);
         s.write_usize(cell, reg1);
 
-        s.write_usize(reg1 + 0x00, create1_inst);
+        s.write_usize(reg1, create1_inst);
         s.write_usize(reg1 + 0x08, name1);
         s.write_usize(reg1 + 0x10, reg2);
         s.write_cstr(name1, "Source2Server001");
 
-        s.write_usize(reg2 + 0x00, create2_inst);
+        s.write_usize(reg2, create2_inst);
         s.write_usize(reg2 + 0x08, name2);
         s.write_usize(reg2 + 0x10, 0);
         s.write_cstr(name2, "Source2Server002");
@@ -1185,7 +1185,7 @@ fn discover_interfaces_in_skips_entries_with_zero_create_or_name() {
         // reg1: create_fn=0, name=0 → skipped; chain continues to reg2
         s.write_usize(reg1 + 0x10, reg2);
 
-        s.write_usize(reg2 + 0x00, create2_inst);
+        s.write_usize(reg2, create2_inst);
         s.write_usize(reg2 + 0x08, name2);
         s.write_usize(reg2 + 0x10, 0);
         s.write_cstr(name2, "Real");
@@ -1215,15 +1215,15 @@ struct SchemaLayout {
 }
 
 fn populate_schema_layout() -> SchemaLayout {
-    let ss_base = 0x10_00_0000usize;
-    let scope_array = 0x10_10_0000usize;
-    let type_scope = 0x10_20_0000usize;
+    let ss_base = 0x1000_0000usize;
+    let scope_array = 0x1010_0000usize;
+    let type_scope = 0x1020_0000usize;
     let class_bindings = type_scope + 0x560;
-    let node = 0x10_40_0000usize;
-    let binding = 0x10_50_0000usize;
-    let class_name = 0x10_60_0000usize;
-    let fields_base = 0x10_70_0000usize;
-    let field_name = 0x10_80_0000usize;
+    let node = 0x1040_0000usize;
+    let binding = 0x1050_0000usize;
+    let class_name = 0x1060_0000usize;
+    let fields_base = 0x1070_0000usize;
+    let field_name = 0x1080_0000usize;
 
     populate(|s| {
         s.write_u32(ss_base + 0x190, 1);
@@ -1246,7 +1246,7 @@ fn populate_schema_layout() -> SchemaLayout {
         s.write_usize(binding + 0x30, fields_base);
         s.write_cstr(class_name, "C_BaseEntity");
 
-        s.write_usize(fields_base + 0x00, field_name);
+        s.write_usize(fields_base, field_name);
         s.write_u32(fields_base + 0x10, 0x42);
         s.write_cstr(field_name, "m_iHealth");
     });
@@ -1324,7 +1324,7 @@ fn walker_schema_system_via_pattern_override() {
         Some(0x28),
         Some(0x45),
     ];
-    let target = 0x77_00_0000usize;
+    let target = 0x7700_0000usize;
     sigscan::set_pattern_rip32("schemasystem.dll", ts_pattern, 3, Some(target));
     // Empty type_scopes vec → lookup fails cleanly.
     populate(|s| {
@@ -1337,8 +1337,8 @@ fn walker_schema_system_via_pattern_override() {
 #[test]
 fn walker_skips_scope_with_zero_ptr() {
     let _g = setup();
-    let ss_base = 0x88_00_0000usize;
-    let scope_array = 0x88_10_0000usize;
+    let ss_base = 0x8800_0000usize;
+    let scope_array = 0x8810_0000usize;
     populate(|s| {
         s.write_u32(ss_base + 0x190, 2);
         s.write_usize(ss_base + 0x190 + 8, scope_array);
@@ -1352,9 +1352,9 @@ fn walker_skips_scope_with_zero_ptr() {
 #[test]
 fn walker_skips_scope_with_mismatched_name() {
     let _g = setup();
-    let ss_base = 0x99_00_0000usize;
-    let scope_array = 0x99_10_0000usize;
-    let scope = 0x99_20_0000usize;
+    let ss_base = 0x9900_0000usize;
+    let scope_array = 0x9910_0000usize;
+    let scope = 0x9920_0000usize;
     populate(|s| {
         s.write_u32(ss_base + 0x190, 1);
         s.write_usize(ss_base + 0x190 + 8, scope_array);
@@ -1368,15 +1368,15 @@ fn walker_skips_scope_with_mismatched_name() {
 #[test]
 fn walker_walks_free_blob_chain() {
     let _g = setup();
-    let ss_base = 0xAA_00_0000usize;
-    let scope_array = 0xAA_10_0000usize;
-    let type_scope = 0xAA_20_0000usize;
+    let ss_base = 0xAA00_0000usize;
+    let scope_array = 0xAA10_0000usize;
+    let type_scope = 0xAA20_0000usize;
     let class_bindings = type_scope + 0x560;
-    let blob = 0xAA_50_0000usize;
-    let binding = 0xAA_60_0000usize;
-    let class_name = 0xAA_70_0000usize;
-    let fields = 0xAA_80_0000usize;
-    let field_name = 0xAA_90_0000usize;
+    let blob = 0xAA50_0000usize;
+    let binding = 0xAA60_0000usize;
+    let class_name = 0xAA70_0000usize;
+    let fields = 0xAA80_0000usize;
+    let field_name = 0xAA90_0000usize;
 
     populate(|s| {
         s.write_u32(ss_base + 0x190, 1);
@@ -1389,7 +1389,7 @@ fn walker_walks_free_blob_chain() {
         s.write_u32(class_bindings + 0x10, 1);
         s.write_usize(class_bindings + 0x20, blob);
 
-        s.write_usize(blob + 0x00, 0);
+        s.write_usize(blob, 0);
         s.write_usize(blob + 0x10, binding);
 
         s.write_usize(binding + 0x08, class_name);
@@ -1397,7 +1397,7 @@ fn walker_walks_free_blob_chain() {
         s.write_usize(binding + 0x30, fields);
         s.write_cstr(class_name, "FromFreeChain");
 
-        s.write_usize(fields + 0x00, field_name);
+        s.write_usize(fields, field_name);
         s.write_u32(fields + 0x10, 0x84);
         s.write_cstr(field_name, "m_x");
     });
@@ -1412,12 +1412,12 @@ fn walker_walks_free_blob_chain() {
 #[test]
 fn walker_visit_binding_skips_null_name_ptr() {
     let _g = setup();
-    let ss_base = 0xBB_00_0000usize;
-    let scope_array = 0xBB_10_0000usize;
-    let type_scope = 0xBB_20_0000usize;
+    let ss_base = 0xBB00_0000usize;
+    let scope_array = 0xBB10_0000usize;
+    let type_scope = 0xBB20_0000usize;
     let class_bindings = type_scope + 0x560;
-    let node = 0xBB_30_0000usize;
-    let binding = 0xBB_40_0000usize;
+    let node = 0xBB30_0000usize;
+    let binding = 0xBB40_0000usize;
 
     populate(|s| {
         s.write_u32(ss_base + 0x190, 1);
@@ -1444,13 +1444,13 @@ fn walker_visit_binding_skips_null_name_ptr() {
 #[test]
 fn walker_visit_binding_skips_unreadable_name() {
     let _g = setup();
-    let ss_base = 0xCC_00_0000usize;
-    let scope_array = 0xCC_10_0000usize;
-    let type_scope = 0xCC_20_0000usize;
+    let ss_base = 0xCC00_0000usize;
+    let scope_array = 0xCC10_0000usize;
+    let type_scope = 0xCC20_0000usize;
     let class_bindings = type_scope + 0x560;
-    let node = 0xCC_30_0000usize;
-    let binding = 0xCC_40_0000usize;
-    let bad_name = 0xCC_F0_0000usize;
+    let node = 0xCC30_0000usize;
+    let binding = 0xCC40_0000usize;
+    let bad_name = 0xCCF0_0000usize;
 
     populate(|s| {
         s.write_u32(ss_base + 0x190, 1);
@@ -1478,7 +1478,7 @@ fn walker_visit_binding_skips_unreadable_name() {
 fn walker_field_with_null_name_skipped() {
     let _g = setup();
     let SchemaLayout { fields_base, .. } = populate_schema_layout();
-    populate(|s| s.write_usize(fields_base + 0x00, 0));
+    populate(|s| s.write_usize(fields_base, 0));
     // Use a fresh field name so the cache doesn't short-circuit.
     assert!(walker::lookup_offset("client.dll", "C_BaseEntity", "no_such_field").is_none());
 }
@@ -1486,9 +1486,9 @@ fn walker_field_with_null_name_skipped() {
 #[test]
 fn walker_skips_scope_with_unreadable_name() {
     let _g = setup();
-    let ss_base = 0xDD_00_0000usize;
-    let scope_array = 0xDD_10_0000usize;
-    let scope = 0xDD_20_0000usize;
+    let ss_base = 0xDD00_0000usize;
+    let scope_array = 0xDD10_0000usize;
+    let scope = 0xDD20_0000usize;
     populate(|s| {
         s.write_u32(ss_base + 0x190, 1);
         s.write_usize(ss_base + 0x190 + 8, scope_array);
@@ -1512,18 +1512,18 @@ fn lookup_or_fallback_returns_runtime_when_present() {
 #[test]
 fn walker_allocated_walk_advances_to_next_node() {
     let _g = setup();
-    let ss_base = 0x12_00_0000usize;
-    let scope_array = 0x12_10_0000usize;
-    let type_scope = 0x12_20_0000usize;
+    let ss_base = 0x1200_0000usize;
+    let scope_array = 0x1210_0000usize;
+    let type_scope = 0x1220_0000usize;
     let class_bindings = type_scope + 0x560;
-    let node1 = 0x12_30_0000usize;
-    let node2 = 0x12_31_0000usize;
-    let binding1 = 0x12_40_0000usize;
-    let binding2 = 0x12_41_0000usize;
-    let name1 = 0x12_50_0000usize;
-    let name2 = 0x12_51_0000usize;
-    let fields2 = 0x12_60_0000usize;
-    let fn_name = 0x12_70_0000usize;
+    let node1 = 0x1230_0000usize;
+    let node2 = 0x1231_0000usize;
+    let binding1 = 0x1240_0000usize;
+    let binding2 = 0x1241_0000usize;
+    let name1 = 0x1250_0000usize;
+    let name2 = 0x1251_0000usize;
+    let fields2 = 0x1260_0000usize;
+    let fn_name = 0x1270_0000usize;
 
     populate(|s| {
         s.write_u32(ss_base + 0x190, 1);
@@ -1553,7 +1553,7 @@ fn walker_allocated_walk_advances_to_next_node() {
         s.write_cstr(name2, "C_Second");
         s.write_i16(binding2 + 0x24, 1);
         s.write_usize(binding2 + 0x30, fields2);
-        s.write_usize(fields2 + 0x00, fn_name);
+        s.write_usize(fields2, fn_name);
         s.write_u32(fields2 + 0x10, 0x77);
         s.write_cstr(fn_name, "m_target");
     });
@@ -1567,11 +1567,11 @@ fn walker_allocated_walk_advances_to_next_node() {
 #[test]
 fn walker_allocated_walk_breaks_when_data_read_fails() {
     let _g = setup();
-    let ss_base = 0x13_00_0000usize;
-    let scope_array = 0x13_10_0000usize;
-    let type_scope = 0x13_20_0000usize;
+    let ss_base = 0x1300_0000usize;
+    let scope_array = 0x1310_0000usize;
+    let type_scope = 0x1320_0000usize;
     let class_bindings = type_scope + 0x560;
-    let node = 0x13_30_0000usize;
+    let node = 0x1330_0000usize;
 
     populate(|s| {
         s.write_u32(ss_base + 0x190, 1);
@@ -1594,11 +1594,11 @@ fn walker_allocated_walk_breaks_when_data_read_fails() {
 #[test]
 fn walker_free_chain_breaks_when_data_read_fails() {
     let _g = setup();
-    let ss_base = 0x14_00_0000usize;
-    let scope_array = 0x14_10_0000usize;
-    let type_scope = 0x14_20_0000usize;
+    let ss_base = 0x1400_0000usize;
+    let scope_array = 0x1410_0000usize;
+    let type_scope = 0x1420_0000usize;
     let class_bindings = type_scope + 0x560;
-    let blob = 0x14_50_0000usize;
+    let blob = 0x1450_0000usize;
 
     populate(|s| {
         s.write_u32(ss_base + 0x190, 1);
@@ -1619,13 +1619,13 @@ fn walker_free_chain_breaks_when_data_read_fails() {
 #[test]
 fn walker_free_chain_capacity_break() {
     let _g = setup();
-    let ss_base = 0x15_00_0000usize;
-    let scope_array = 0x15_10_0000usize;
-    let type_scope = 0x15_20_0000usize;
+    let ss_base = 0x1500_0000usize;
+    let scope_array = 0x1510_0000usize;
+    let type_scope = 0x1520_0000usize;
     let class_bindings = type_scope + 0x560;
-    let blob = 0x15_50_0000usize;
-    let binding = 0x15_60_0000usize;
-    let name = 0x15_70_0000usize;
+    let blob = 0x1550_0000usize;
+    let binding = 0x1560_0000usize;
+    let name = 0x1570_0000usize;
 
     populate(|s| {
         s.write_u32(ss_base + 0x190, 1);
@@ -1637,7 +1637,7 @@ fn walker_free_chain_capacity_break() {
         s.write_u32(class_bindings + 0x10, 1); // peak = 1
         s.write_usize(class_bindings + 0x20, blob);
 
-        s.write_usize(blob + 0x00, 0);
+        s.write_usize(blob, 0);
         s.write_usize(blob + 0x10, binding);
 
         // binding doesn't match → visit returns true → seen2 reaches cap2 → break
@@ -1652,9 +1652,9 @@ fn walker_free_chain_capacity_break() {
 fn walker_field_with_unreadable_name_skipped() {
     let _g = setup();
     let SchemaLayout { fields_base, .. } = populate_schema_layout();
-    let bad = 0xEE_F0_0000usize;
+    let bad = 0xEEF0_0000usize;
     populate(|s| {
-        s.write_usize(fields_base + 0x00, bad);
+        s.write_usize(fields_base, bad);
         s.deny_read(bad);
     });
     assert!(walker::lookup_offset("client.dll", "C_BaseEntity", "other").is_none());
@@ -1663,12 +1663,12 @@ fn walker_field_with_unreadable_name_skipped() {
 #[test]
 fn walker_visit_binding_unreadable_name_field() {
     let _g = setup();
-    let ss_base = 0x16_00_0000usize;
-    let scope_array = 0x16_10_0000usize;
-    let type_scope = 0x16_20_0000usize;
+    let ss_base = 0x1600_0000usize;
+    let scope_array = 0x1610_0000usize;
+    let type_scope = 0x1620_0000usize;
     let class_bindings = type_scope + 0x560;
-    let node = 0x16_30_0000usize;
-    let binding = 0x16_40_0000usize;
+    let node = 0x1630_0000usize;
+    let binding = 0x1640_0000usize;
 
     populate(|s| {
         s.write_u32(ss_base + 0x190, 1);
@@ -1695,18 +1695,18 @@ fn walker_visit_binding_unreadable_name_field() {
 #[test]
 fn walker_free_chain_advances_through_multiple_blobs() {
     let _g = setup();
-    let ss_base = 0x17_00_0000usize;
-    let scope_array = 0x17_10_0000usize;
-    let type_scope = 0x17_20_0000usize;
+    let ss_base = 0x1700_0000usize;
+    let scope_array = 0x1710_0000usize;
+    let type_scope = 0x1720_0000usize;
     let class_bindings = type_scope + 0x560;
-    let blob1 = 0x17_50_0000usize;
-    let blob2 = 0x17_51_0000usize;
-    let binding1 = 0x17_60_0000usize;
-    let binding2 = 0x17_61_0000usize;
-    let name1 = 0x17_70_0000usize;
-    let name2 = 0x17_71_0000usize;
-    let fields2 = 0x17_80_0000usize;
-    let fn_name = 0x17_90_0000usize;
+    let blob1 = 0x1750_0000usize;
+    let blob2 = 0x1751_0000usize;
+    let binding1 = 0x1760_0000usize;
+    let binding2 = 0x1761_0000usize;
+    let name1 = 0x1770_0000usize;
+    let name2 = 0x1771_0000usize;
+    let fields2 = 0x1780_0000usize;
+    let fn_name = 0x1790_0000usize;
 
     populate(|s| {
         s.write_u32(ss_base + 0x190, 1);
@@ -1719,10 +1719,10 @@ fn walker_free_chain_advances_through_multiple_blobs() {
         s.write_usize(class_bindings + 0x20, blob1);
 
         // blob1 -> blob2 -> 0
-        s.write_usize(blob1 + 0x00, blob2);
+        s.write_usize(blob1, blob2);
         s.write_usize(blob1 + 0x10, binding1);
 
-        s.write_usize(blob2 + 0x00, 0);
+        s.write_usize(blob2, 0);
         s.write_usize(blob2 + 0x10, binding2);
 
         // binding1 doesn't match → fall through, advance to blob2
@@ -1734,7 +1734,7 @@ fn walker_free_chain_advances_through_multiple_blobs() {
         s.write_cstr(name2, "Wanted");
         s.write_i16(binding2 + 0x24, 1);
         s.write_usize(binding2 + 0x30, fields2);
-        s.write_usize(fields2 + 0x00, fn_name);
+        s.write_usize(fields2, fn_name);
         s.write_u32(fields2 + 0x10, 0x99);
         s.write_cstr(fn_name, "m_w");
     });
@@ -1818,14 +1818,14 @@ fn walker_inherits_field_from_parent_class() {
     // name must walk `base_classes -> SchemaBaseClassInfoData.class ->
     // SchemaBaseClass.name` and resolve the parent's direct field.
     let _g = setup();
-    let region = 0x18_00_0000usize;
+    let region = 0x1800_0000usize;
     let layout = populate_inheritance_layout(region, "Child", "Parent", 0);
     let parent_fields = region + 0x70_0000;
     let parent_field_name = region + 0x80_0000;
     populate(|s| {
         s.write_i16(layout.binding_parent + 0x24, 1);
         s.write_usize(layout.binding_parent + 0x30, parent_fields);
-        s.write_usize(parent_fields + 0x00, parent_field_name);
+        s.write_usize(parent_fields, parent_field_name);
         s.write_u32(parent_fields + 0x10, 0xAA);
         s.write_cstr(parent_field_name, "m_inherited");
     });
@@ -1839,7 +1839,7 @@ fn walker_inherits_field_from_parent_class() {
 fn walker_direct_field_preferred_over_inherited() {
     // Both child and parent declare `m_overlap`; the direct field must win.
     let _g = setup();
-    let region = 0x19_00_0000usize;
+    let region = 0x1900_0000usize;
     let layout = populate_inheritance_layout(region, "Child", "Parent", 1);
     let child_fields = region + 0x90_0000;
     let child_field_name = region + 0x91_0000;
@@ -1848,14 +1848,14 @@ fn walker_direct_field_preferred_over_inherited() {
     populate(|s| {
         // Child direct field with offset 0xC1.
         s.write_usize(region + 0x40_0000 + 0x30, child_fields);
-        s.write_usize(child_fields + 0x00, child_field_name);
+        s.write_usize(child_fields, child_field_name);
         s.write_u32(child_fields + 0x10, 0xC1);
         s.write_cstr(child_field_name, "m_overlap");
 
         // Parent direct field with offset 0xBA (must NOT be returned).
         s.write_i16(layout.binding_parent + 0x24, 1);
         s.write_usize(layout.binding_parent + 0x30, parent_fields);
-        s.write_usize(parent_fields + 0x00, parent_field_name);
+        s.write_usize(parent_fields, parent_field_name);
         s.write_u32(parent_fields + 0x10, 0xBA);
         s.write_cstr(parent_field_name, "m_overlap");
     });
@@ -1870,13 +1870,13 @@ fn walker_no_base_class_returns_none() {
     // Class with no direct field and a null base_classes pointer must NOT
     // accidentally return a stale or zero offset.
     let _g = setup();
-    let ss_base = 0x1A_00_0000usize;
-    let scope_array = 0x1A_10_0000usize;
-    let type_scope = 0x1A_20_0000usize;
+    let ss_base = 0x1A00_0000usize;
+    let scope_array = 0x1A10_0000usize;
+    let type_scope = 0x1A20_0000usize;
     let class_bindings = type_scope + 0x560;
-    let node = 0x1A_30_0000usize;
-    let binding = 0x1A_40_0000usize;
-    let class_name = 0x1A_50_0000usize;
+    let node = 0x1A30_0000usize;
+    let binding = 0x1A40_0000usize;
+    let class_name = 0x1A50_0000usize;
 
     populate(|s| {
         s.write_u32(ss_base + 0x190, 1);
@@ -1904,7 +1904,7 @@ fn walker_cyclic_base_class_terminates() {
     // Parent name resolves back to the child binding itself — recursion
     // guard must bail rather than blow the stack.
     let _g = setup();
-    let region = 0x1B_00_0000usize;
+    let region = 0x1B00_0000usize;
     let layout = populate_inheritance_layout(region, "Loop", "Loop", 0);
     // Mark parent as having zero direct fields too; the lookup must miss
     // and unwind through the depth/identity guard cleanly.
@@ -1924,27 +1924,27 @@ fn walker_cyclic_base_class_terminates() {
 fn walker_inherits_through_two_levels() {
     // Child -> Mid -> Grand, field declared only on Grand.
     let _g = setup();
-    let ss_base = 0x1C_00_0000usize;
-    let scope_array = 0x1C_10_0000usize;
-    let type_scope = 0x1C_20_0000usize;
+    let ss_base = 0x1C00_0000usize;
+    let scope_array = 0x1C10_0000usize;
+    let type_scope = 0x1C20_0000usize;
     let class_bindings = type_scope + 0x560;
-    let n1 = 0x1C_30_0000usize;
-    let n2 = 0x1C_31_0000usize;
-    let n3 = 0x1C_32_0000usize;
-    let b_child = 0x1C_40_0000usize;
-    let b_mid = 0x1C_41_0000usize;
-    let b_grand = 0x1C_42_0000usize;
-    let s_child = 0x1C_50_0000usize;
-    let s_mid = 0x1C_51_0000usize;
-    let s_grand = 0x1C_52_0000usize;
-    let bi_child = 0x1C_60_0000usize;
-    let bi_mid = 0x1C_61_0000usize;
-    let pl_child = 0x1C_62_0000usize;
-    let pl_mid = 0x1C_63_0000usize;
-    let pn_mid = 0x1C_64_0000usize;
-    let pn_grand = 0x1C_65_0000usize;
-    let grand_fields = 0x1C_70_0000usize;
-    let grand_field_name = 0x1C_80_0000usize;
+    let n1 = 0x1C30_0000usize;
+    let n2 = 0x1C31_0000usize;
+    let n3 = 0x1C32_0000usize;
+    let b_child = 0x1C40_0000usize;
+    let b_mid = 0x1C41_0000usize;
+    let b_grand = 0x1C42_0000usize;
+    let s_child = 0x1C50_0000usize;
+    let s_mid = 0x1C51_0000usize;
+    let s_grand = 0x1C52_0000usize;
+    let bi_child = 0x1C60_0000usize;
+    let bi_mid = 0x1C61_0000usize;
+    let pl_child = 0x1C62_0000usize;
+    let pl_mid = 0x1C63_0000usize;
+    let pn_mid = 0x1C64_0000usize;
+    let pn_grand = 0x1C65_0000usize;
+    let grand_fields = 0x1C70_0000usize;
+    let grand_field_name = 0x1C80_0000usize;
 
     populate(|s| {
         s.write_u32(ss_base + 0x190, 1);
@@ -1990,7 +1990,7 @@ fn walker_inherits_through_two_levels() {
         s.write_i16(b_grand + 0x24, 1);
         s.write_usize(b_grand + 0x30, grand_fields);
         s.write_usize(b_grand + 0x40, 0);
-        s.write_usize(grand_fields + 0x00, grand_field_name);
+        s.write_usize(grand_fields, grand_field_name);
         s.write_u32(grand_fields + 0x10, 0xDE);
         s.write_cstr(grand_field_name, "m_deep");
     });
@@ -2128,7 +2128,7 @@ fn slots_populate_writes_live_interfaces_into_atomic_slot() {
     populate(|s| {
         s.add_export("server.dll", "CreateInterface", ci_inst);
         s.write_usize(cell, reg);
-        s.write_usize(reg + 0x00, create_inst);
+        s.write_usize(reg, create_inst);
         s.write_usize(reg + 0x08, name_addr);
         s.write_usize(reg + 0x10, 0);
         s.write_cstr(name_addr, "Source2Server001");
@@ -2282,7 +2282,7 @@ fn discover_interfaces_in_skips_entry_with_unreadable_name() {
     populate(|s| {
         s.add_export("baz.dll", "CreateInterface", ci_inst);
         s.write_usize(cell, reg);
-        s.write_usize(reg + 0x00, create_inst);
+        s.write_usize(reg, create_inst);
         s.write_usize(reg + 0x08, bad_name);
         s.write_usize(reg + 0x10, 0);
         s.deny_read(bad_name);
