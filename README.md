@@ -94,6 +94,10 @@ Pattern scanning for runtime globals and related discovery now goes through
 reader-backed `pe-sigscan` APIs, so custom backends are supported for scanning
 too, not just primitive reads.
 
+If your backend is purely local and can safely dereference module memory in the
+current process, override `Process::scan_text` and `Process::resolve_rel32_at`
+to call the direct `pe-sigscan` fast path for maximum performance.
+
 See docs.rs for the four attribute macros and the `Process` trait.
 
 ## Using With MinHook
