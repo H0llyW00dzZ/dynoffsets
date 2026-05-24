@@ -299,6 +299,16 @@ pub(crate) const fn fnv1a_bytes(bytes: &[u8]) -> u32 {
     hash
 }
 
+#[inline]
+const fn str_len_u16(s: &str) -> u16 {
+    let len = s.len();
+    if len > u16::MAX as usize {
+        u16::MAX
+    } else {
+        len as u16
+    }
+}
+
 /// Internal helper used by the `#[schema]` macro.
 ///
 /// Returns the runtime offset if the schema walker found it, otherwise `fallback`.
@@ -309,11 +319,11 @@ pub fn lookup_or_fallback(module: &str, class: &str, field: &str, fallback: usiz
     let fh = fnv1a(field);
     lookup_or_fallback_h(
         mh,
-        module.len() as u16,
+        str_len_u16(module),
         ch,
-        class.len() as u16,
+        str_len_u16(class),
         fh,
-        field.len() as u16,
+        str_len_u16(field),
         fallback,
     )
 }
@@ -330,11 +340,11 @@ pub fn try_lookup_offset(module: &str, class: &str, field: &str) -> Option<usize
     let fh = fnv1a(field);
     try_lookup_offset_h(
         mh,
-        module.len() as u16,
+        str_len_u16(module),
         ch,
-        class.len() as u16,
+        str_len_u16(class),
         fh,
-        field.len() as u16,
+        str_len_u16(field),
     )
 }
 

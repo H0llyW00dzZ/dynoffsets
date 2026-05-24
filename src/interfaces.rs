@@ -3,7 +3,7 @@
 //! Powers the `#[interfaces]` macro. See [`RuntimeInterfaces`],
 //! [`discover_interfaces`] and [`discover_interfaces_in`].
 
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::vec::Vec;
 
 use hashbrown::HashMap;
@@ -37,37 +37,37 @@ const MAX_NAME: usize = 128;
 ///
 /// This is the version used by the `#[interfaces]` macro by default.
 pub fn discover_interfaces() -> RuntimeInterfaces {
-    let owned: Vec<String> = vec![
-        obfstr!("animationsystem.dll").to_string(),
-        obfstr!("client.dll").to_string(),
-        obfstr!("engine2.dll").to_string(),
-        obfstr!("filesystem_stdio.dll").to_string(),
-        obfstr!("host.dll").to_string(),
-        obfstr!("inputsystem.dll").to_string(),
-        obfstr!("localize.dll").to_string(),
-        obfstr!("matchmaking.dll").to_string(),
-        obfstr!("materialsystem2.dll").to_string(),
-        obfstr!("meshsystem.dll").to_string(),
-        obfstr!("navsystem.dll").to_string(),
-        obfstr!("networksystem.dll").to_string(),
-        obfstr!("panorama.dll").to_string(),
-        obfstr!("particles.dll").to_string(),
-        obfstr!("pulse_system.dll").to_string(),
-        obfstr!("rendersystemdx11.dll").to_string(),
-        obfstr!("resourcesystem.dll").to_string(),
-        obfstr!("scenefilecache.dll").to_string(),
-        obfstr!("scenesystem.dll").to_string(),
-        obfstr!("schemasystem.dll").to_string(),
-        obfstr!("server.dll").to_string(),
-        obfstr!("soundsystem.dll").to_string(),
-        obfstr!("steamaudio.dll").to_string(),
-        obfstr!("tier0.dll").to_string(),
-        obfstr!("v8system.dll").to_string(),
-        obfstr!("vphysics2.dll").to_string(),
-        obfstr!("vscript.dll").to_string(),
-        obfstr!("worldrenderer.dll").to_string(),
+    let modules = [
+        String::from(obfstr!("animationsystem.dll")),
+        String::from(obfstr!("client.dll")),
+        String::from(obfstr!("engine2.dll")),
+        String::from(obfstr!("filesystem_stdio.dll")),
+        String::from(obfstr!("host.dll")),
+        String::from(obfstr!("inputsystem.dll")),
+        String::from(obfstr!("localize.dll")),
+        String::from(obfstr!("matchmaking.dll")),
+        String::from(obfstr!("materialsystem2.dll")),
+        String::from(obfstr!("meshsystem.dll")),
+        String::from(obfstr!("navsystem.dll")),
+        String::from(obfstr!("networksystem.dll")),
+        String::from(obfstr!("panorama.dll")),
+        String::from(obfstr!("particles.dll")),
+        String::from(obfstr!("pulse_system.dll")),
+        String::from(obfstr!("rendersystemdx11.dll")),
+        String::from(obfstr!("resourcesystem.dll")),
+        String::from(obfstr!("scenefilecache.dll")),
+        String::from(obfstr!("scenesystem.dll")),
+        String::from(obfstr!("schemasystem.dll")),
+        String::from(obfstr!("server.dll")),
+        String::from(obfstr!("soundsystem.dll")),
+        String::from(obfstr!("steamaudio.dll")),
+        String::from(obfstr!("tier0.dll")),
+        String::from(obfstr!("v8system.dll")),
+        String::from(obfstr!("vphysics2.dll")),
+        String::from(obfstr!("vscript.dll")),
+        String::from(obfstr!("worldrenderer.dll")),
     ];
-    let modules: Vec<&str> = owned.iter().map(String::as_str).collect();
+    let modules = modules.iter().map(String::as_str).collect::<Vec<_>>();
     discover_interfaces_in(&modules)
 }
 
@@ -95,13 +95,9 @@ pub fn discover_interfaces_in(modules: &[&str]) -> RuntimeInterfaces {
             continue;
         }
 
-        let entries = walk(head);
+        let entries: HashMap<_, _> = walk(head).into_iter().collect();
         if !entries.is_empty() {
-            let mut mm = HashMap::with_capacity(entries.len());
-            for (k, v) in entries {
-                mm.insert(k, v);
-            }
-            out.map.insert(m.to_string(), mm);
+            out.map.insert(m.to_owned(), entries);
         }
     }
     out

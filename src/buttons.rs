@@ -3,7 +3,7 @@
 //! Used by the `#[buttons]` macro to turn button name constants into
 //! functions that return the runtime `&state` pointer.
 
-use alloc::string::{String, ToString};
+use alloc::string::String;
 
 use hashbrown::HashMap;
 use obfstr::obfstr;
@@ -61,13 +61,11 @@ const MAX_NAME: usize = 32;
 pub fn discover_buttons() -> RuntimeButtons {
     let mut out = RuntimeButtons::default();
 
-    let cell = match find_pattern_rip32(obfstr!("client.dll"), BTN_PATTERN, BTN_DISP) {
-        Some(a) => a,
-        None => return out,
-    };
-    let mut node = match mem::read_usize(cell) {
-        Some(v) if v != 0 => v,
-        _ => return out,
+    let Some(mut node) = find_pattern_rip32(obfstr!("client.dll"), BTN_PATTERN, BTN_DISP)
+        .and_then(mem::read_usize)
+        .filter(|&node| node != 0)
+    else {
+        return out;
     };
 
     for _ in 0..MAX_CHAIN {
@@ -82,13 +80,13 @@ pub fn discover_buttons() -> RuntimeButtons {
         };
 
         if let Some(state) = node.checked_add(STATE_OFF) {
-            out.map.insert(name.to_string(), state);
+            out.map.insert(name, state);
         }
 
-        match mem::read_usize_off(node, NEXT_OFF) {
-            Some(0) | None => break,
-            Some(n) => node = n,
-        }
+        let Some(next) = mem::read_usize_off(node, NEXT_OFF).filter(|&next| next != 0) else {
+            break;
+        };
+        node = next;
     }
     out
 }
