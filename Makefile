@@ -2,7 +2,7 @@
         build build-release check \
         test test-default test-all test-no-default \
         fmt fmt-check \
-        clippy clippy-fix \
+        clippy clippy-fix lint \
         doc doc-open \
         coverage coverage-html \
         bench audit \
@@ -61,6 +61,7 @@ help: header
 	@echo Lint and format:
 	@echo   fmt                Apply rustfmt to the workspace
 	@echo   fmt-check          Verify rustfmt is clean (CI gate)
+	@echo   lint               Run fmt-check + clippy  (quick scan)
 	@echo   clippy             Run clippy with -D warnings on all features and targets
 	@echo   clippy-fix         Apply clippy auto-fixes
 	@echo.
@@ -75,7 +76,7 @@ help: header
 	@echo   audit              cargo-audit security check (requires cargo-audit)
 	@echo.
 	@echo Composite:
-	@echo   verify             fmt-check + clippy + test-all  (full local CI gate)
+	@echo   verify             lint + test-all  (full local CI gate)
 	@echo   publish-dry        cargo publish --dry-run
 	@echo   all                header + build + test
 	@echo.
@@ -139,6 +140,9 @@ fmt-check: header
 # ---------------------------------------------------------------------------
 # Clippy
 # ---------------------------------------------------------------------------
+lint: header fmt-check clippy
+	@echo :: Lint passed.
+
 clippy: header
 	@echo :: Running clippy...
 	cargo clippy --all-features --all-targets -- -D warnings
@@ -147,6 +151,8 @@ clippy: header
 clippy-fix: header
 	@echo :: Applying clippy fixes...
 	cargo clippy --all-features --all-targets --fix --allow-dirty --allow-staged
+	@echo :: Applying rustfmt after clippy fixes...
+	cargo fmt --all
 	@echo :: Done.
 
 # ---------------------------------------------------------------------------
@@ -195,7 +201,7 @@ audit: header
 # Composite gates
 # ---------------------------------------------------------------------------
 # Full local CI gate. Run this before opening a PR.
-verify: header fmt-check clippy test-all
+verify: header lint test-all
 	@echo :: Verify passed.
 
 # Pre-publish smoke test — tells you exactly what crates.io will receive.
