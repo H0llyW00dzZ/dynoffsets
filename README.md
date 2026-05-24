@@ -18,6 +18,16 @@ Resolve offsets, globals, interfaces and buttons at call time with literal fallb
 
 </td></tr></table>
 
+## Current Release
+
+- Official public source of truth: GitHub
+- Repository: <https://github.com/H0llyW00dzZ/dynoffsets>
+
+This project is intended to be open-sourced publicly on GitHub. If you see the
+same source posted elsewhere, for example on UC forums, treat it as an
+unofficial repost or copy of this repository unless the GitHub repository links
+to it explicitly.
+
 ## Installation
 
 **Recommended**:
@@ -77,8 +87,6 @@ Supported backends include (but are not limited to):
 - kernel drivers (any IOCTL, physical memory, etc.)
 - DMA / PCIe cards, FPGA, Thunderbolt DMA
 - hypervisor / VM introspection
-
-Windows only today. TODO: Linux support.
 
 See docs.rs for the four attribute macros and the `Process` trait.
 
@@ -146,6 +154,10 @@ unsafe fn install_hook() {
 
 The same idea works for exported functions too: resolve the function entry with
 your own backend or module logic, then hand that address to MinHook.
+
+## TODO
+
+- [ ] Linux support. The crate is Windows-only today.
 
 ## cs2-dumper vs dynoffsets
 
