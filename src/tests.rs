@@ -173,6 +173,37 @@ impl Process for StaticBytesProc {
     }
 }
 
+#[cfg(feature = "runtime")]
+struct OverrideScanProc;
+
+#[cfg(feature = "runtime")]
+impl Process for OverrideScanProc {
+    fn read_bytes(&self, _: usize, _: &mut [u8]) -> Option<()> {
+        None
+    }
+
+    fn module_base(&self, _: &str) -> Option<usize> {
+        None
+    }
+
+    fn scan_text(&self, module: &str, pattern: &[Option<u8>]) -> Option<usize> {
+        if module == "fast.dll" && pattern == [Some(0x90)] {
+            Some(0x1234)
+        } else {
+            None
+        }
+    }
+
+    fn resolve_rel32_at(
+        &self,
+        inst_addr: usize,
+        disp_off: usize,
+        instr_len: usize,
+    ) -> Option<usize> {
+        Some(inst_addr + disp_off + instr_len)
+    }
+}
+
 #[test]
 fn process_default_read_cstring_finds_nul() {
     let p = StaticBytesProc(b"hello\0xxxxx");
@@ -190,6 +221,20 @@ fn process_default_read_cstring_rejects_non_utf8() {
     static BAD: &[u8] = &[0xFF, 0xFE, 0x00];
     let p = StaticBytesProc(BAD);
     assert_eq!(p.read_cstring(0, 3), None);
+}
+
+#[cfg(feature = "runtime")]
+#[test]
+fn process_scan_text_can_be_overridden_for_local_fast_path() {
+    let p = OverrideScanProc;
+    assert_eq!(p.scan_text("fast.dll", &[Some(0x90)]), Some(0x1234));
+}
+
+#[cfg(feature = "runtime")]
+#[test]
+fn process_resolve_rel32_can_be_overridden_for_local_fast_path() {
+    let p = OverrideScanProc;
+    assert_eq!(p.resolve_rel32_at(0x1000, 3, 7), Some(0x100A));
 }
 
 // ---------------------------------------------------------------------------
