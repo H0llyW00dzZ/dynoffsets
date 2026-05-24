@@ -3,6 +3,11 @@ use alloc::string::String;
 use crate::process;
 
 #[inline]
+fn checked_addr(base: usize, off: usize) -> Option<usize> {
+    base.checked_add(off)
+}
+
+#[inline]
 pub fn read_usize(addr: usize) -> Option<usize> {
     process()?.read_usize(addr)
 }
@@ -17,15 +22,15 @@ pub fn read_i16(addr: usize) -> Option<i16> {
 
 #[inline]
 pub fn read_usize_off(base: usize, off: usize) -> Option<usize> {
-    read_usize(base.checked_add(off)?)
+    checked_addr(base, off).and_then(read_usize)
 }
 #[inline]
 pub fn read_u32_off(base: usize, off: usize) -> Option<u32> {
-    read_u32(base.checked_add(off)?)
+    checked_addr(base, off).and_then(read_u32)
 }
 #[inline]
 pub fn read_i16_off(base: usize, off: usize) -> Option<i16> {
-    read_i16(base.checked_add(off)?)
+    checked_addr(base, off).and_then(read_i16)
 }
 
 #[inline]

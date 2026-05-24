@@ -1,4 +1,5 @@
 # dynoffsets
+[![codecov](https://codecov.io/gh/H0llyW00dzZ/dynoffsets/graph/badge.svg?token=Q1W56W96L7)](https://codecov.io/gh/H0llyW00dzZ/dynoffsets)
 
 Resolve offsets, globals, interfaces and buttons at call time with literal fallbacks.
 

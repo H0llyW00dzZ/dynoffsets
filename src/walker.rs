@@ -4,8 +4,6 @@
 //! scopes and class bindings to resolve field offsets for the `#[schema]`
 //! macro.
 
-use alloc::string::String;
-use alloc::vec;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use hashbrown::HashMap;
@@ -107,17 +105,10 @@ fn schema_system() -> Option<usize> {
         SCHEMA_SYSTEM_PATTERN,
         SCHEMA_SYSTEM_DISP,
     )
-    .unwrap_or(0);
+    .unwrap_or_default();
     SCHEMA_SYSTEM.store(v, Ordering::Release);
     RESOLVED.store(true, Ordering::Release);
     (v != 0).then_some(v)
-}
-
-fn cstr(addr: usize, max: usize) -> Option<String> {
-    let mut b = vec![0u8; max];
-    crate::process()?.read_bytes(addr, &mut b)?;
-    let n = b.iter().position(|&x| x == 0).unwrap_or(max);
-    core::str::from_utf8(&b[..n]).ok().map(Into::into)
 }
 
 pub fn lookup_offset(module: &str, class: &str, field: &str) -> Option<u32> {
@@ -185,18 +176,18 @@ fn resolve_class_h(dll_h: u32, scope: usize, class_h: u32, class_len: u16) -> Op
 
 fn type_scope_h(dll_h: u32, dll_len: u16) -> Option<usize> {
     let ss = schema_system()?;
-    let vec = ss + SS_TYPE_SCOPES;
-    let cnt = mem::read_u32_off(vec, VEC_COUNT)? as usize;
-    let data = mem::read_ptr(vec, VEC_DATA)?;
+    let type_scopes = ss.checked_add(SS_TYPE_SCOPES)?;
+    let cnt = mem::read_u32_off(type_scopes, VEC_COUNT)? as usize;
+    let data = mem::read_ptr(type_scopes, VEC_DATA)?;
 
     for i in 0..cnt {
-        let elem = data.checked_add(i * VEC_STRIDE)?;
+        let elem = data.checked_add(i.checked_mul(VEC_STRIDE)?)?;
         let ptr = mem::read_usize(elem)?;
         if ptr == 0 {
             continue;
         }
-        let name_p = ptr + TS_NAME;
-        if let Some(n) = cstr(name_p, TS_NAME_LEN) {
+        let name_p = ptr.checked_add(TS_NAME)?;
+        if let Some(n) = mem::read_cstring(name_p, TS_NAME_LEN) {
             // Normalize for .dll suffix so fnv1a("client") and fnv1a("client.dll") both work.
             // Length discriminator: requested `dll_len` may correspond to either form.
             let base = n.trim_end_matches(".dll");
@@ -245,9 +236,15 @@ fn walk_classes<F>(scope: usize, mut visit: F)
 where
     F: FnMut(&str, usize) -> bool,
 {
-    let hash = scope + TS_CLASS_BINDINGS;
-    let mempool = hash + HASH_ENTRY_MEM;
-    let buckets = hash + HASH_BUCKETS;
+    let Some(hash) = scope.checked_add(TS_CLASS_BINDINGS) else {
+        return;
+    };
+    let Some(mempool) = hash.checked_add(HASH_ENTRY_MEM) else {
+        return;
+    };
+    let Some(buckets) = hash.checked_add(HASH_BUCKETS) else {
+        return;
+    };
 
     let alloc = mem::read_u32_off(mempool, MEMPOOL_ALLOC).unwrap_or(0) as usize;
     let peak = mem::read_u32_off(mempool, MEMPOOL_PEAK).unwrap_or(0) as usize;
@@ -256,7 +253,12 @@ where
     let cap = if alloc == 0 { MAX_CHAIN } else { alloc };
 
     'outer: for b in 0..HASH_BUCKET_COUNT {
-        let bucket = buckets + b * HASH_BUCKET_STRIDE;
+        let Some(bucket) = b
+            .checked_mul(HASH_BUCKET_STRIDE)
+            .and_then(|offset| buckets.checked_add(offset))
+        else {
+            break;
+        };
 
         let mut node = mem::read_usize_off(bucket, BUCKET_FIRST_UNC).unwrap_or(0);
         let mut len = 0usize;
@@ -362,7 +364,7 @@ fn field_off_direct_h(cls: usize, want_h: u32, want_len: u16) -> Option<u32> {
     let base = mem::read_ptr(cls, CLASS_FIELDS)?;
 
     for i in 0..cnt {
-        let e = base.checked_add(i * FIELD_STRIDE)?;
+        let e = base.checked_add(i.checked_mul(FIELD_STRIDE)?)?;
         let np = mem::read_usize_off(e, FIELD_NAME)?;
         if np == 0 {
             continue;
