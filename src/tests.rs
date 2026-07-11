@@ -78,10 +78,7 @@ fn init_is_idempotent() {
     let _g = setup();
     init(DummyProc);
     populate(|s| s.add_module("client.dll", 0x1234));
-    assert_eq!(
-        crate::process().unwrap().module_base("client.dll"),
-        Some(0x1234)
-    );
+    assert_eq!(crate::process().unwrap().module_base("client.dll"), Some(0x1234));
 }
 
 #[test]
@@ -483,10 +480,7 @@ fn sigscan_find_pattern_u32_via_override_some_and_none() {
     let _g = setup();
     let pat = &[Some(0xCCu8)][..];
     sigscan::set_pattern_u32("m.dll", pat, 2, Some(0xDEAD_BEEF));
-    assert_eq!(
-        sigscan::find_pattern_u32("m.dll", pat, 2),
-        Some(0xDEAD_BEEF)
-    );
+    assert_eq!(sigscan::find_pattern_u32("m.dll", pat, 2), Some(0xDEAD_BEEF));
 
     let pat2 = &[Some(0xDDu8)][..];
     sigscan::set_pattern_u32("m.dll", pat2, 2, None);
@@ -500,10 +494,7 @@ fn sigscan_find_pattern_u32_reads_unaligned_from_match_site() {
     populate(|s| s.write_u32(addr + 3, 0xCAFE_BABE));
     let pat = &[Some(0xEEu8)][..];
     sigscan::set_pattern("m.dll", pat, Some(addr));
-    assert_eq!(
-        sigscan::find_pattern_u32("m.dll", pat, 3),
-        Some(0xCAFE_BABE)
-    );
+    assert_eq!(sigscan::find_pattern_u32("m.dll", pat, 3), Some(0xCAFE_BABE));
 }
 
 #[test]
@@ -593,17 +584,8 @@ fn discover_globals_all_none_when_no_matches() {
 #[test]
 fn discover_globals_resolves_one_known_pattern() {
     let _g = setup();
-    let pat: &[Option<u8>] = &[
-        Some(0x48),
-        Some(0x89),
-        Some(0x05),
-        None,
-        None,
-        None,
-        None,
-        Some(0x33),
-        Some(0xC0),
-    ];
+    let pat: &[Option<u8>] =
+        &[Some(0x48), Some(0x89), Some(0x05), None, None, None, None, Some(0x33), Some(0xC0)];
     populate(|s| s.add_module("inputsystem.dll", 0));
     sigscan::set_pattern_rip32("inputsystem.dll", pat, 3, Some(0xFEED_FACE_usize));
     let r = offsets::discover_globals();
@@ -790,17 +772,8 @@ fn discover_globals_local_player_pawn_none_when_prediction_missing() {
 #[test]
 fn discover_globals_resolves_u32_imm_highest_entity_index() {
     let _g = setup();
-    let pat: &[Option<u8>] = &[
-        Some(0xFF),
-        Some(0x81),
-        None,
-        None,
-        None,
-        None,
-        Some(0x48),
-        Some(0x85),
-        Some(0xD2),
-    ];
+    let pat: &[Option<u8>] =
+        &[Some(0xFF), Some(0x81), None, None, None, None, Some(0x48), Some(0x85), Some(0xD2)];
     sigscan::set_pattern_u32("client.dll", pat, 2, Some(0x2090));
     let r = offsets::discover_globals();
     assert_eq!(r.dw_game_entity_system_highest_entity_index, Some(0x2090));
@@ -949,8 +922,9 @@ fn discover_globals_resolves_all_remaining_struct_offset_fields() {
             Some(0xCC),
             Some(0xCC),
             Some(0xCC),
-            Some(0x40),
-            Some(0x53),
+            Some(0x48),
+            Some(0x83),
+            Some(0xEC),
         ],
         3,
         Some(0x2C141F),
@@ -1341,20 +1315,14 @@ fn populate_schema_layout() -> SchemaLayout {
     });
 
     walker::_test_set_schema_system(ss_base);
-    SchemaLayout {
-        ss_base,
-        fields_base,
-    }
+    SchemaLayout { ss_base, fields_base }
 }
 
 #[test]
 fn walker_happy_path_resolves_field_offset() {
     let _g = setup();
     populate_schema_layout();
-    assert_eq!(
-        walker::lookup_offset("client.dll", "C_BaseEntity", "m_iHealth"),
-        Some(0x42)
-    );
+    assert_eq!(walker::lookup_offset("client.dll", "C_BaseEntity", "m_iHealth"), Some(0x42));
 }
 
 #[test]
@@ -1492,10 +1460,7 @@ fn walker_walks_free_blob_chain() {
     });
 
     walker::_test_set_schema_system(ss_base);
-    assert_eq!(
-        walker::lookup_offset("client.dll", "FromFreeChain", "m_x"),
-        Some(0x84)
-    );
+    assert_eq!(walker::lookup_offset("client.dll", "FromFreeChain", "m_x"), Some(0x84));
 }
 
 #[test]
@@ -1592,10 +1557,7 @@ fn walker_skips_scope_with_unreadable_name() {
 fn lookup_or_fallback_returns_runtime_when_present() {
     let _g = setup();
     populate_schema_layout();
-    assert_eq!(
-        lookup_or_fallback("client.dll", "C_BaseEntity", "m_iHealth", 0xDEAD),
-        0x42
-    );
+    assert_eq!(lookup_or_fallback("client.dll", "C_BaseEntity", "m_iHealth", 0xDEAD), 0x42);
 }
 
 #[test]
@@ -1647,10 +1609,7 @@ fn walker_allocated_walk_advances_to_next_node() {
         s.write_cstr(fn_name, "m_target");
     });
     walker::_test_set_schema_system(ss_base);
-    assert_eq!(
-        walker::lookup_offset("client.dll", "C_Second", "m_target"),
-        Some(0x77)
-    );
+    assert_eq!(walker::lookup_offset("client.dll", "C_Second", "m_target"), Some(0x77));
 }
 
 #[test]
@@ -1828,10 +1787,7 @@ fn walker_free_chain_advances_through_multiple_blobs() {
         s.write_cstr(fn_name, "m_w");
     });
     walker::_test_set_schema_system(ss_base);
-    assert_eq!(
-        walker::lookup_offset("client.dll", "Wanted", "m_w"),
-        Some(0x99)
-    );
+    assert_eq!(walker::lookup_offset("client.dll", "Wanted", "m_w"), Some(0x99));
 }
 
 struct InheritanceLayout {
@@ -1893,12 +1849,7 @@ fn populate_inheritance_layout(
         s.write_cstr(parent_name_str, parent_name);
     });
     walker::_test_set_schema_system(ss_base);
-    InheritanceLayout {
-        binding_parent,
-        base_info,
-        parent_lite,
-        base_class_name_str,
-    }
+    InheritanceLayout { binding_parent, base_info, parent_lite, base_class_name_str }
 }
 
 #[test]
@@ -1918,10 +1869,7 @@ fn walker_inherits_field_from_parent_class() {
         s.write_u32(parent_fields + 0x10, 0xAA);
         s.write_cstr(parent_field_name, "m_inherited");
     });
-    assert_eq!(
-        walker::lookup_offset("client.dll", "Child", "m_inherited"),
-        Some(0xAA)
-    );
+    assert_eq!(walker::lookup_offset("client.dll", "Child", "m_inherited"), Some(0xAA));
 }
 
 #[test]
@@ -1948,10 +1896,7 @@ fn walker_direct_field_preferred_over_inherited() {
         s.write_u32(parent_fields + 0x10, 0xBA);
         s.write_cstr(parent_field_name, "m_overlap");
     });
-    assert_eq!(
-        walker::lookup_offset("client.dll", "Child", "m_overlap"),
-        Some(0xC1)
-    );
+    assert_eq!(walker::lookup_offset("client.dll", "Child", "m_overlap"), Some(0xC1));
 }
 
 #[test]
@@ -2001,11 +1946,7 @@ fn walker_cyclic_base_class_terminates() {
         s.write_i16(layout.binding_parent + 0x24, 0);
         s.write_usize(layout.binding_parent + 0x30, 0);
     });
-    let _ = (
-        layout.base_info,
-        layout.parent_lite,
-        layout.base_class_name_str,
-    );
+    let _ = (layout.base_info, layout.parent_lite, layout.base_class_name_str);
     assert!(walker::lookup_offset("client.dll", "Loop", "m_x").is_none());
 }
 
@@ -2084,10 +2025,7 @@ fn walker_inherits_through_two_levels() {
         s.write_cstr(grand_field_name, "m_deep");
     });
     walker::_test_set_schema_system(ss_base);
-    assert_eq!(
-        walker::lookup_offset("client.dll", "Child", "m_deep"),
-        Some(0xDE)
-    );
+    assert_eq!(walker::lookup_offset("client.dll", "Child", "m_deep"), Some(0xDE));
 }
 
 use core::sync::atomic::{AtomicUsize, Ordering};
@@ -2134,17 +2072,8 @@ fn slots_populate_writes_live_globals_into_atomic_slot() {
     let _g = setup();
     // Force a live discovered value for dw_input_system via the existing
     // pattern override; this drives discover_globals() to return Some(...).
-    let pat: &[Option<u8>] = &[
-        Some(0x48),
-        Some(0x89),
-        Some(0x05),
-        None,
-        None,
-        None,
-        None,
-        Some(0x33),
-        Some(0xC0),
-    ];
+    let pat: &[Option<u8>] =
+        &[Some(0x48), Some(0x89), Some(0x05), None, None, None, None, Some(0x33), Some(0xC0)];
     populate(|s| s.add_module("inputsystem.dll", 0));
     sigscan::set_pattern_rip32("inputsystem.dll", pat, 3, Some(0xFEED_FACE_usize));
 
@@ -2260,17 +2189,8 @@ fn slots_populate_writes_live_buttons_into_atomic_slot() {
 #[test]
 fn slots_populate_is_idempotent() {
     let _g = setup();
-    let pat: &[Option<u8>] = &[
-        Some(0x48),
-        Some(0x89),
-        Some(0x05),
-        None,
-        None,
-        None,
-        None,
-        Some(0x33),
-        Some(0xC0),
-    ];
+    let pat: &[Option<u8>] =
+        &[Some(0x48), Some(0x89), Some(0x05), None, None, None, None, Some(0x33), Some(0xC0)];
     populate(|s| s.add_module("inputsystem.dll", 0));
     sigscan::set_pattern_rip32("inputsystem.dll", pat, 3, Some(0xFEED_FACE_usize));
 
@@ -2286,10 +2206,7 @@ fn slots_populate_is_idempotent() {
 
 #[test]
 fn runtime_globals_get_known_field_returns_value() {
-    let g = offsets::RuntimeGlobals {
-        dw_input_system: Some(0x1234),
-        ..Default::default()
-    };
+    let g = offsets::RuntimeGlobals { dw_input_system: Some(0x1234), ..Default::default() };
     assert_eq!(g.get("dw_input_system"), Some(0x1234));
 }
 
@@ -2351,15 +2268,7 @@ fn runtime_globals_get_covers_every_field_name() {
 #[test]
 fn populate_stats_default_is_all_zero() {
     let s = static_mod::PopulateStats::default();
-    assert_eq!(
-        s,
-        static_mod::PopulateStats {
-            globals: 0,
-            schema: 0,
-            interfaces: 0,
-            buttons: 0
-        }
-    );
+    assert_eq!(s, static_mod::PopulateStats { globals: 0, schema: 0, interfaces: 0, buttons: 0 });
 }
 
 #[test]

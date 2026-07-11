@@ -121,10 +121,5 @@ pub(crate) fn _test_clear() {
 
 #[cfg(test)]
 pub(crate) fn _test_counts() -> (usize, usize, usize, usize) {
-    (
-        GLOBALS.lock().len(),
-        SCHEMA.lock().len(),
-        INTERFACES.lock().len(),
-        BUTTONS.lock().len(),
-    )
+    (GLOBALS.lock().len(), SCHEMA.lock().len(), INTERFACES.lock().len(), BUTTONS.lock().len())
 }

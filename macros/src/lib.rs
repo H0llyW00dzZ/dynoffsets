@@ -24,12 +24,7 @@ struct Args {
 
 impl Default for Args {
     fn default() -> Self {
-        Args {
-            dll: "client.dll".to_string(),
-            enabled: true,
-            static_storage: false,
-            hashed: false,
-        }
+        Args { dll: "client.dll".to_string(), enabled: true, static_storage: false, hashed: false }
     }
 }
 
@@ -104,12 +99,7 @@ impl ConstInfo {
     fn from_item_const(c: &ItemConst) -> Self {
         let fn_name = c.ident.clone();
         let name_str = LitStr::new(&fn_name.to_string(), c.ident.span());
-        Self {
-            fn_name,
-            vis: c.vis.clone(),
-            lit_expr: expr_tokens(&c.expr),
-            name_str,
-        }
+        Self { fn_name, vis: c.vis.clone(), lit_expr: expr_tokens(&c.expr), name_str }
     }
 }
 
@@ -191,12 +181,7 @@ fn rewrite_schema_module(class_mod: &mut ItemMod, args: &Args) {
     let enabled = args.enabled;
     let hashed = args.hashed;
     rewrite_dynamic_consts(items, |info| {
-        let ConstInfo {
-            fn_name,
-            vis,
-            lit_expr,
-            name_str: field_str,
-        } = info;
+        let ConstInfo { fn_name, vis, lit_expr, name_str: field_str } = info;
         if enabled {
             let lookup = if hashed {
                 let dll_len = dll.len() as u16;
@@ -251,12 +236,7 @@ fn rewrite_globals_module(module: &mut ItemMod, args: &Args) {
     }
 
     rewrite_dynamic_consts(items, |info| {
-        let ConstInfo {
-            fn_name,
-            vis,
-            lit_expr,
-            ..
-        } = info;
+        let ConstInfo { fn_name, vis, lit_expr, .. } = info;
         cached_accessor(
             vis,
             fn_name,
@@ -298,12 +278,7 @@ fn rewrite_interfaces_module(module: &mut ItemMod, args: &Args) {
 
     let enabled = args.enabled;
     rewrite_dynamic_consts(items, |info| {
-        let ConstInfo {
-            fn_name,
-            vis,
-            lit_expr,
-            name_str,
-        } = info;
+        let ConstInfo { fn_name, vis, lit_expr, name_str } = info;
         if enabled {
             cached_accessor(
                 vis,
@@ -350,12 +325,7 @@ fn rewrite_buttons_module(module: &mut ItemMod, args: &Args) {
     }
 
     rewrite_dynamic_consts(items, |info| {
-        let ConstInfo {
-            fn_name,
-            vis,
-            lit_expr,
-            name_str,
-        } = info;
+        let ConstInfo { fn_name, vis, lit_expr, name_str } = info;
         cached_accessor(
             vis,
             fn_name,
@@ -553,12 +523,8 @@ mod tests {
     #[test]
     fn rewrite_schema_disabled_emits_literal_fn() {
         let mut m = parse_mod("mod C_Foo { pub const m_x: usize = 0x10; }");
-        let args = Args {
-            dll: "client.dll".into(),
-            enabled: false,
-            static_storage: false,
-            hashed: false,
-        };
+        let args =
+            Args { dll: "client.dll".into(), enabled: false, static_storage: false, hashed: false };
         rewrite_schema_module(&mut m, &args);
         let s = quote!(#m).to_string();
         assert!(!s.contains("lookup_or_fallback"));
@@ -636,12 +602,8 @@ mod tests {
     #[test]
     fn rewrite_interfaces_disabled_emits_literal() {
         let mut m = parse_mod("mod i { pub const Source2Client002: usize = 0xAA; }");
-        let args = Args {
-            dll: "client.dll".into(),
-            enabled: false,
-            static_storage: false,
-            hashed: false,
-        };
+        let args =
+            Args { dll: "client.dll".into(), enabled: false, static_storage: false, hashed: false };
         rewrite_interfaces_module(&mut m, &args);
         let s = quote!(#m).to_string();
         assert!(!s.contains("get_runtime_interfaces"));
@@ -703,12 +665,7 @@ mod tests {
     }
 
     fn static_args(dll: &str) -> Args {
-        Args {
-            dll: dll.into(),
-            enabled: true,
-            static_storage: true,
-            hashed: false,
-        }
+        Args { dll: dll.into(), enabled: true, static_storage: true, hashed: false }
     }
 
     #[test]

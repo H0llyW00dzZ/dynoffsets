@@ -439,14 +439,7 @@ pub fn try_lookup_offset(module: &str, class: &str, field: &str) -> Option<usize
     let mh = fnv1a(module);
     let ch = fnv1a(class);
     let fh = fnv1a(field);
-    try_lookup_offset_h(
-        mh,
-        str_len_u16(module),
-        ch,
-        str_len_u16(class),
-        fh,
-        str_len_u16(field),
-    )
+    try_lookup_offset_h(mh, str_len_u16(module), ch, str_len_u16(class), fh, str_len_u16(field))
 }
 
 /// Hash-keyed variant of [`lookup_or_fallback`].
@@ -465,10 +458,8 @@ pub fn lookup_or_fallback_h(
     field_len: u16,
     fallback: usize,
 ) -> usize {
-    try_lookup_offset_h(
-        dll_hash, dll_len, class_hash, class_len, field_hash, field_len,
-    )
-    .unwrap_or(fallback)
+    try_lookup_offset_h(dll_hash, dll_len, class_hash, class_len, field_hash, field_len)
+        .unwrap_or(fallback)
 }
 
 /// Hash-keyed variant of [`try_lookup_offset`].
@@ -483,16 +474,12 @@ pub fn try_lookup_offset_h(
 ) -> Option<usize> {
     #[cfg(feature = "runtime")]
     {
-        walker::lookup_offset_h(
-            dll_hash, dll_len, class_hash, class_len, field_hash, field_len,
-        )
-        .map(|off| off as usize)
+        walker::lookup_offset_h(dll_hash, dll_len, class_hash, class_len, field_hash, field_len)
+            .map(|off| off as usize)
     }
     #[cfg(not(feature = "runtime"))]
     {
-        let _ = (
-            dll_hash, dll_len, class_hash, class_len, field_hash, field_len,
-        );
+        let _ = (dll_hash, dll_len, class_hash, class_len, field_hash, field_len);
         None
     }
 }
