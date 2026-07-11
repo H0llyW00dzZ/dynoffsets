@@ -115,14 +115,7 @@ pub fn lookup_offset(module: &str, class: &str, field: &str) -> Option<u32> {
     let mh = crate::fnv1a(module);
     let ch = crate::fnv1a(class);
     let fh = crate::fnv1a(field);
-    lookup_offset_h(
-        mh,
-        module.len() as u16,
-        ch,
-        class.len() as u16,
-        fh,
-        field.len() as u16,
-    )
+    lookup_offset_h(mh, module.len() as u16, ch, class.len() as u16, fh, field.len() as u16)
 }
 
 /// Hash-keyed lookup (no `String` keys on hot path; strings from target memory only).
@@ -142,12 +135,8 @@ pub fn lookup_offset_h(
             return Some(o);
         }
     }
-    let off = lookup_uncached_h(
-        dll_hash, dll_len, class_hash, class_len, field_hash, field_len,
-    )?;
-    cache()
-        .lock()
-        .insert((dll_hash, class_hash, field_hash), off);
+    let off = lookup_uncached_h(dll_hash, dll_len, class_hash, class_len, field_hash, field_len)?;
+    cache().lock().insert((dll_hash, class_hash, field_hash), off);
     Some(off)
 }
 
@@ -253,9 +242,8 @@ where
     let cap = if alloc == 0 { MAX_CHAIN } else { alloc };
 
     'outer: for b in 0..HASH_BUCKET_COUNT {
-        let Some(bucket) = b
-            .checked_mul(HASH_BUCKET_STRIDE)
-            .and_then(|offset| buckets.checked_add(offset))
+        let Some(bucket) =
+            b.checked_mul(HASH_BUCKET_STRIDE).and_then(|offset| buckets.checked_add(offset))
         else {
             break;
         };
